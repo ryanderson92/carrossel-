@@ -122,6 +122,15 @@ details.setup[open] summary h2::after{content:" ▴"}
 .credit a,.hint a,.note a{color:var(--accent)}
 @media (min-width:960px){.gallery{width:auto}}
 @media (prefers-reduced-motion:no-preference){.strip{scroll-behavior:smooth}}
+.step{display:flex;gap:10px;align-items:flex-start;margin:18px 0 10px}
+.step .num{flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
+.step strong{display:block;font-size:15px}
+.step .hint{margin:2px 0 0}
+.chats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chats a{display:block;text-align:center;text-decoration:none;font-weight:600;border-radius:12px;border:1px solid var(--line);background:var(--field);color:var(--ink);padding:12px 10px}
+#pasteManual{margin-top:0}
+details.more{margin-top:14px}
+details.more summary{cursor:pointer;color:var(--muted);font-size:14px}
 </style>
 </head>
 <body>
@@ -140,7 +149,7 @@ details.setup[open] summary h2::after{content:" ▴"}
           <div class="seg" id="prov">
             <button type="button" data-v="gemini" aria-pressed="true">Gemini (grátis)</button>
             <button type="button" data-v="claude" aria-pressed="false">Claude</button>
-            <button type="button" data-v="manual" aria-pressed="false">Colar roteiro</button>
+            <button type="button" data-v="manual" aria-pressed="false">Sem chave (usar um chat)</button>
           </div>
         </div>
         <div id="provGemini">
@@ -204,16 +213,27 @@ details.setup[open] summary h2::after{content:" ▴"}
         </div>
         <p class="status" id="status" role="status" aria-live="polite"></p>
         <div id="manualBox" hidden>
-          <div class="field">
-            <label for="manualPrompt">Pedido para o chat</label>
-            <textarea id="manualPrompt" readonly placeholder="Toque em “Copiar pedido para o chat” para montar o pedido."></textarea>
+          <div class="step"><span class="num">1</span><div><strong>Abra um chat de IA</strong><p class="hint">O chat abre com o pedido já escrito. Se o campo vier vazio, é só colar: o pedido também fica copiado.</p></div></div>
+          <div class="chats" id="chats">
+            <a href="https://chatgpt.com/" data-chat="chatgpt" target="_blank" rel="noopener">ChatGPT</a>
+            <a href="https://claude.ai/new" data-chat="claude" target="_blank" rel="noopener">Claude</a>
+            <a href="https://gemini.google.com/app" data-chat="gemini" target="_blank" rel="noopener">Gemini</a>
+            <a href="#" data-chat="copiar">Só copiar</a>
           </div>
-          <div class="field">
-            <label for="manualPaste">Cole aqui a resposta do chat</label>
-            <textarea id="manualPaste" placeholder="A resposta começa com {&quot;slides&quot;"></textarea>
-          </div>
-          <button id="pasteManual" type="button" style="margin-top:10px;width:100%">Colar resposta e montar</button>
-          <button id="buildManual" type="button" style="margin-top:10px;width:100%">Montar carrossel</button>
+          <div class="step"><span class="num">2</span><div><strong>Copie a resposta e volte aqui</strong><p class="hint">Use o botão de copiar que aparece embaixo da resposta do chat.</p></div></div>
+          <button class="primary" id="pasteManual" type="button">Colar resposta e montar</button>
+          <details class="more">
+            <summary>Colar à mão ou ver o pedido</summary>
+            <div class="field">
+              <label for="manualPaste">Cole aqui a resposta do chat</label>
+              <textarea id="manualPaste" placeholder="Toque e segure aqui e escolha Colar"></textarea>
+            </div>
+            <button id="buildManual" type="button" style="margin-top:10px;width:100%">Montar carrossel</button>
+            <div class="field">
+              <label for="manualPrompt">Pedido para o chat</label>
+              <textarea id="manualPrompt" readonly placeholder="Escreva a ideia acima e toque em um dos chats."></textarea>
+            </div>
+          </details>
         </div>
       </section>
 
@@ -673,9 +693,9 @@ function saveCfg(){try{localStorage.setItem(CFG_KEY,JSON.stringify(cfg))}catch(e
 function updateSetupUI(){
   const p=cfg.provider;
   $("provGemini").hidden=p!=="gemini";$("provClaude").hidden=p!=="claude";$("provManual").hidden=p!=="manual";$("manualBox").hidden=p!=="manual";
-  genBtn.textContent=p==="manual"?"Copiar pedido para o chat":"Gerar carrossel";
+  genBtn.hidden=p==="manual";
   const ready=p==="manual"||(p==="gemini"&&cfg.gemini)||(p==="claude"&&cfg.claude);
-  $("setupSummary").textContent=`${p==="gemini"?"Gemini":p==="claude"?"Claude":"Colar roteiro"}${ready?"":" (falta a chave)"}, fotos ${cfg.pexels?"ativadas":"sem chave do Pexels"}`;
+  $("setupSummary").textContent=`${p==="gemini"?"Gemini":p==="claude"?"Claude":"Sem chave, usando um chat"}${ready?"":" (falta a chave)"}, fotos ${cfg.pexels?"ativadas":"sem chave do Pexels"}`;
 }
 function setProvider(v){cfg.provider=v;saveCfg();document.querySelectorAll("#prov button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===v)));updateSetupUI()}
 $("prov").addEventListener("click",e=>{const b=e.target.closest("button");if(b)setProvider(b.dataset.v)});
@@ -770,7 +790,7 @@ genBtn.addEventListener("click",async()=>{
     return;
   }
   const key=cfg.provider==="gemini"?cfg.gemini:cfg.claude;
-  if(!key){setStatus("Adicione a chave da IA em Configuração, ou escolha “Colar roteiro”.",true);$("setup").open=true;$("setup").scrollIntoView({block:"start"});return}
+  if(!key){setStatus("Adicione a chave da IA em Configuração, ou escolha “Sem chave (usar um chat)”.",true);$("setup").open=true;$("setup").scrollIntoView({block:"start"});return}
   genBtn.disabled=true;ctl=new AbortController();stopBtn.hidden=false;setStatus("Escrevendo os slides…");
   try{
     const text=cfg.provider==="gemini"?await callGemini(prompt,ctl.signal):await callClaude(prompt,ctl.signal);
@@ -783,17 +803,34 @@ genBtn.addEventListener("click",async()=>{
   }finally{genBtn.disabled=false;stopBtn.hidden=true;ctl=null}
 });
 stopBtn.addEventListener("click",()=>ctl&&ctl.abort());
+/* modo sem chave: abrir o chat já com o pedido e colar a resposta de volta */
+const CHAT_SUFFIX="\n\nImportante: coloque o JSON dentro de um único bloco de código ```json, sem nenhum texto fora dele, para que eu possa copiar com um toque.";
+const CHAT_URL={chatgpt:q=>"https://chatgpt.com/?q="+encodeURIComponent(q),claude:q=>"https://claude.ai/new?q="+encodeURIComponent(q),gemini:()=>"https://gemini.google.com/app"};
+let awaitingChat=false;
+function chatPrompt(){const topic=$("topic").value.trim();if(!topic)return null;return buildPrompt(topic,+$("count").value,$("tone").selectedOptions[0].textContent)+CHAT_SUFFIX}
+function copyNow(t){let ok=false;try{const ta=document.createElement("textarea");ta.value=t;ta.setAttribute("readonly","");ta.style.cssText="position:fixed;top:0;left:0;opacity:0";document.body.appendChild(ta);ta.select();ta.setSelectionRange(0,t.length);ok=document.execCommand("copy");ta.remove()}catch(e){}
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).catch(()=>{});return ok}
+$("chats").addEventListener("click",e=>{
+  const a=e.target.closest("a[data-chat]");if(!a)return;const kind=a.dataset.chat,pr=chatPrompt();
+  if(!pr){e.preventDefault();setStatus("Primeiro escreva a ideia do carrossel no campo acima.",true);$("topic").focus();return}
+  copyNow(pr);$("manualPrompt").value=pr;awaitingChat=true;
+  if(kind==="copiar"){e.preventDefault();setStatus("Pedido copiado. Cole em qualquer chat de IA, copie a resposta e volte aqui.");return}
+  a.href=CHAT_URL[kind](pr);
+  setStatus(kind==="gemini"?"Pedido copiado. No Gemini, toque e segure no campo de mensagem e escolha Colar.":"Abrindo o chat com o pedido. Se o campo vier vazio, é só colar.");
+});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&awaitingChat&&cfg.provider==="manual"){setStatus("Copiou a resposta do chat? Toque em “Colar resposta e montar”.");$("pasteManual").scrollIntoView({block:"center",behavior:"smooth"})}});
 async function buildFromManual(){
-  try{const data=parseJSON($("manualPaste").value);await applyData(data);setStatus(`Pronto: ${state.slides.length} slides. Ajuste o que quiser abaixo.`)}
+  try{const data=parseJSON($("manualPaste").value);await applyData(data);awaitingChat=false;setStatus(`Pronto: ${state.slides.length} slides. Ajuste o que quiser abaixo.`)}
   catch(e){
-    if(e&&e.message==="vazio"){setStatus("O campo “Cole aqui a resposta do chat” está vazio. Copie a resposta inteira no chat e cole nele, ou toque em “Colar resposta e montar”.",true);$("manualPaste").focus();return}
+    if(e&&e.message==="vazio"){setStatus("Nada para montar ainda. Copie a resposta no chat e toque em “Colar resposta e montar”.",true);return}
     setStatus(e&&e.message&&e.message!=="json"&&!/JSON|token/i.test(e.message)?e.message:"Não reconheci a resposta. Copie a resposta inteira do chat (use o botão de copiar do próprio chat) e cole de novo.",true)}
 }
 $("buildManual").addEventListener("click",buildFromManual);
 $("manualPaste").addEventListener("paste",()=>setTimeout(()=>{if($("manualPaste").value.trim())buildFromManual()},50));
 $("pasteManual").addEventListener("click",async()=>{
   let t="";try{t=await navigator.clipboard.readText()}catch(e){}
-  if(!t.trim()){setStatus("Não consegui ler a área de transferência. Toque e segure no campo “Cole aqui a resposta do chat” e escolha Colar.",true);$("manualPaste").focus();return}
+  if(!t.trim()){document.querySelector("details.more").open=true;setStatus("Não consegui ler o que você copiou. Toque e segure no campo abaixo e escolha Colar.",true);$("manualPaste").focus();return}
+  if(t.trim()===$("manualPrompt").value.trim()){setStatus("Isso ainda é o pedido. No chat, copie a resposta dele e toque aqui de novo.",true);return}
   $("manualPaste").value=t;buildFromManual();
 });
 
