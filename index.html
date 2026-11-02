@@ -1003,8 +1003,38 @@ document.getElementById("copy").addEventListener("click",async()=>{
   setTimeout(()=>note.textContent="",2500);
 });
 
+/* ---------- receber um carrossel enviado pelo Gira no Claude (#c=...) ---------- */
+function importFromHash(){
+  const m=location.hash.match(/^#c=([A-Za-z0-9_-]+)/);if(!m)return false;
+  try{
+    const b64=m[1].replace(/-/g,"+").replace(/_/g,"/"),bin=atob(b64+"===".slice((b64.length+3)%4));
+    const d=JSON.parse(new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0))));
+    if(!Array.isArray(d.s)||!d.s.length)return false;
+    if(FORMATS[d.f])state.format=d.f;
+    if(TEMPLATES[d.t])state.template=d.t;
+    if(/^#[0-9a-f]{6}$/i.test(d.c||""))state.brand=d.c;
+    if(d.h!=null)state.handle=String(d.h);
+    if(d.n!=null)state.name=String(d.n);
+    state.verified=d.v!==false;
+    state.caption=String(d.cap||"");
+    state.slides=d.s.slice(0,10).map(x=>{const s={titulo:String(x[0]||""),texto:String(x[1]||""),busca:String(x[2]||"")};if(Number.isInteger(x[3]))s.img=newImg(genArt(state.brand,x[3]),"arte",x[3]);return s});
+    state.isExample=false;
+    return true;
+  }catch(e){return false}
+  finally{try{history.replaceState(null,"",location.pathname+location.search)}catch(e){}}
+}
+const imported=importFromHash();
+
 /* ---------- start ---------- */
 buildAll();
+if(imported){
+  document.querySelectorAll("#fmt button").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.v===state.format)));
+  setTemplate(state.template);
+  brandInput.value=state.brand;sw.querySelectorAll(".sw").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.c.toLowerCase()===state.brand.toLowerCase())));
+  $("handle").value=state.handle;$("name").value=state.name;$("verified").checked=state.verified;
+  galleryNote.textContent="Carrossel recebido. Toque em “Salvar na galeria do celular” e escolha “Salvar imagens” para salvar todos de uma vez.";
+  setTimeout(()=>$("gallery").scrollIntoView({block:"center"}),300);
+}
 Promise.all([
   document.fonts.load(`800 100px "Bricolage Grotesque"`),
   document.fonts.load(`700 100px "Fraunces"`),document.fonts.load(`600 100px "Fraunces"`),
