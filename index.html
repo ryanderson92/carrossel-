@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gira: carrosséis automáticos</title>
+<meta name="theme-color" content="#5B3DF5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Gira">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script>if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));</script>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎠</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --bg:#ECEEF2; --surface:#FFFFFF; --ink:#1A1D24; --muted:#5D6371; --line:#D3D7DF;
+  --accent:#4A2FE0; --accent-ink:#FFFFFF; --field:#F6F7F9; --danger:#B42318;
+  color-scheme: light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14161B; --surface:#1D2027; --ink:#ECEEF2; --muted:#9CA2AF; --line:#2F333C;
+    --accent:#9C8BFF; --accent-ink:#14161B; --field:#252831; --danger:#FF8A80;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14161B; --surface:#1D2027; --ink:#ECEEF2; --muted:#9CA2AF; --line:#2F333C;
+  --accent:#9C8BFF; --accent-ink:#14161B; --field:#252831; --danger:#FF8A80;
+  color-scheme: dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Figtree","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 48px}
+header.top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:8px 0 20px}
+.logo{font:800 34px/1 "Bricolage Grotesque","Arial Black",sans-serif;letter-spacing:-.02em;margin:0}
+.tag{color:var(--muted);margin:0}
+.grid{display:grid;gap:20px;grid-template-columns:minmax(0,1fr)}
+.grid > *{min-width:0}
+html,body{overflow-x:hidden}
+@media (min-width:960px){
+  .grid{grid-template-columns:minmax(0,380px) minmax(0,1fr);align-items:start}
+}
+@media (max-width:420px){
+  .wrap{padding:14px 12px 40px}
+  .panel{padding:14px;border-radius:14px}
+  .logo{font-size:28px}
+  .row{grid-template-columns:1fr}
+  .seg button{flex:1 1 auto}
+}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px}
+.panel + .panel{margin-top:16px}
+h2{font:700 19px/1.25 "Bricolage Grotesque",sans-serif;margin:0 0 12px}
+label{display:block;font-weight:600;font-size:14px;margin:0 0 6px}
+.hint{font-size:13px;color:var(--muted);margin:6px 0 0}
+textarea,input[type=text],select{width:100%;font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+textarea{resize:vertical;min-height:110px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.field{margin-top:14px}
+button{font:inherit;cursor:pointer;border-radius:12px;border:1px solid var(--line);background:var(--field);color:var(--ink);padding:10px 14px;font-weight:600}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);width:100%;padding:13px 16px;font-size:16px;margin-top:16px}
+button:disabled{opacity:.55;cursor:not-allowed}
+button.link{background:none;border:none;padding:6px 0;color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.status{font-size:14px;margin:10px 0 0;min-height:21px;color:var(--muted)}
+.status.err{color:var(--danger)}
+.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{padding:8px 12px;font-size:14px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.swatches{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sw{width:34px;height:34px;border-radius:50%;padding:0;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line)}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 2px var(--ink)}
+input[type=color]{width:42px;height:34px;padding:0;border:1px solid var(--line);border-radius:10px;background:none}
+.stage-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.badge{font-size:13px;color:var(--muted)}
+.strip{display:flex;gap:14px;overflow-x:auto;max-width:100%;scroll-snap-type:x mandatory;padding:4px 2px 14px;-webkit-overflow-scrolling:touch}
+.strip canvas{flex:0 0 auto;width:min(72vw,300px);height:auto;border-radius:10px;scroll-snap-align:start;box-shadow:0 1px 2px rgba(0,0,0,.08),0 8px 24px rgba(20,22,40,.12);background:#fff}
+.editor{display:grid;gap:12px;margin-top:8px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+.card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px}
+.card-head strong{font-size:14px}
+.card-head button{padding:6px 10px;font-size:13px}
+.card input{margin-bottom:8px}
+.card textarea{min-height:70px}
+.exports{display:grid;gap:10px}
+.exports button{width:100%}
+#caption{min-height:150px}
+.note{font-size:13px;color:var(--muted)}
+.gallery{margin-top:2px}
+.imgbox{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}
+.img-actions{display:flex;gap:8px;flex-wrap:wrap}
+.img-actions button{padding:7px 10px;font-size:13px}
+.sliders{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin-top:10px}
+.sliders label{font-size:12px;font-weight:600;color:var(--muted);margin:0}
+.card .sliders input{margin:0}
+input[type=range]{width:100%;accent-color:var(--accent);height:28px}
+.check{display:flex;gap:8px;align-items:center;font-weight:500;margin:0}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
+details.setup summary{cursor:pointer;list-style:none;display:flex;flex-direction:column;gap:2px}
+details.setup summary::-webkit-details-marker{display:none}
+details.setup summary h2::after{content:" ▾";color:var(--muted);font-weight:500}
+details.setup[open] summary h2::after{content:" ▴"}
+.psearch{display:flex;gap:8px}
+.card .psearch input{margin:0;flex:1;min-width:0}
+.thumbs{display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px}
+.thumbs button{flex:0 0 auto;padding:0;border-radius:10px;overflow:hidden;width:64px;height:80px;border:2px solid transparent;background:var(--field)}
+.thumbs button[aria-pressed="true"]{border-color:var(--accent)}
+.thumbs img{width:100%;height:100%;object-fit:cover;display:block}
+.imgbox .img-actions{margin-top:10px}
+.credit{font-size:12px;color:var(--muted);margin:8px 0 0}
+.credit a,.hint a,.note a{color:var(--accent)}
+@media (min-width:960px){.gallery{width:auto}}
+@media (prefers-reduced-motion:no-preference){.strip{scroll-behavior:smooth}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1 class="logo">Gira</h1>
+    <p class="tag">Do tema ao carrossel pronto para postar.</p>
+  </header>
+
+  <div class="grid">
+    <div class="side">
+      <details class="panel setup" id="setup">
+        <summary><h2 style="margin:0">Configuração</h2><span class="note" id="setupSummary"></span></summary>
+        <div class="field">
+          <label>IA que escreve os textos</label>
+          <div class="seg" id="prov">
+            <button type="button" data-v="gemini" aria-pressed="true">Gemini (grátis)</button>
+            <button type="button" data-v="claude" aria-pressed="false">Claude</button>
+            <button type="button" data-v="manual" aria-pressed="false">Colar roteiro</button>
+          </div>
+        </div>
+        <div id="provGemini">
+          <div class="field">
+            <label for="cfg-gemini">Chave do Gemini</label>
+            <input type="password" id="cfg-gemini" autocomplete="off" placeholder="Cole a chave aqui">
+            <p class="hint">Crie grátis em <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com</a>, em “Get API key”. O plano gratuito tem limite de uso.</p>
+          </div>
+          <div class="field">
+            <label for="cfg-geminiModel">Modelo do Gemini</label>
+            <input type="text" id="cfg-geminiModel" autocomplete="off">
+          </div>
+        </div>
+        <div id="provClaude" hidden>
+          <div class="field">
+            <label for="cfg-claude">Chave da API do Claude</label>
+            <input type="password" id="cfg-claude" autocomplete="off" placeholder="Cole a chave aqui">
+            <p class="hint">Crie no <a href="https://console.anthropic.com" target="_blank" rel="noopener">console da Anthropic</a>. É cobrado por uso.</p>
+          </div>
+          <div class="field">
+            <label for="cfg-claudeModel">Modelo do Claude</label>
+            <input type="text" id="cfg-claudeModel" autocomplete="off">
+          </div>
+        </div>
+        <div id="provManual" hidden>
+          <p class="hint">Sem chave nenhuma: o app monta o pedido, você cola em qualquer chat de IA (como o Claude ou o Gemini), copia a resposta e cola de volta aqui.</p>
+        </div>
+        <div class="field">
+          <label for="cfg-pexels">Chave do Pexels (fotos)</label>
+          <input type="password" id="cfg-pexels" autocomplete="off" placeholder="Cole a chave aqui">
+          <p class="hint">Grátis em <a href="https://www.pexels.com/api/" target="_blank" rel="noopener">pexels.com/api</a>. Sem ela, você ainda pode subir fotos da galeria.</p>
+        </div>
+        <p class="hint">As chaves ficam salvas só neste aparelho.</p>
+      </details>
+
+      <section class="panel" aria-labelledby="h-gen">
+        <h2 id="h-gen">Conteúdo</h2>
+        <label for="topic">Sobre o que é o carrossel?</label>
+        <textarea id="topic" placeholder="Ex.: 5 erros que travam o crescimento de uma loja online. Você também pode colar um texto, artigo ou roteiro."></textarea>
+        <div class="row">
+          <div>
+            <label for="count">Slides</label>
+            <select id="count">
+              <option>5</option><option>6</option><option selected>7</option><option>8</option><option>9</option><option>10</option>
+            </select>
+          </div>
+          <div>
+            <label for="tone">Tom</label>
+            <select id="tone">
+              <option value="educativo">Educativo</option>
+              <option value="direto">Direto ao ponto</option>
+              <option value="inspirador">Inspirador</option>
+              <option value="bem-humorado">Bem-humorado</option>
+              <option value="profissional">Profissional (B2B)</option>
+            </select>
+          </div>
+        </div>
+        <button class="primary" id="gen">Gerar carrossel</button>
+        <div class="actions">
+          <button class="link" id="stop" hidden>Parar</button>
+        </div>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+        <div id="manualBox" hidden>
+          <div class="field">
+            <label for="manualPrompt">Pedido para o chat</label>
+            <textarea id="manualPrompt" readonly placeholder="Toque em “Copiar pedido para o chat” para montar o pedido."></textarea>
+          </div>
+          <div class="field">
+            <label for="manualPaste">Cole aqui a resposta do chat</label>
+            <textarea id="manualPaste" placeholder="A resposta começa com {&quot;slides&quot;"></textarea>
+          </div>
+          <button id="buildManual" type="button" style="margin-top:10px;width:100%">Montar carrossel</button>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-look">
+        <h2 id="h-look">Visual</h2>
+        <label>Formato</label>
+        <div class="seg" id="fmt">
+          <button data-v="4:5" aria-pressed="true">4:5 Feed e LinkedIn</button>
+          <button data-v="1:1" aria-pressed="false">1:1 Quadrado</button>
+          <button data-v="9:16" aria-pressed="false">9:16 Stories e TikTok</button>
+        </div>
+        <div class="field">
+          <label>Estilo</label>
+          <div class="seg" id="tpl">
+            <button data-v="solido" aria-pressed="true">Sólido</button>
+            <button data-v="editorial" aria-pressed="false">Editorial</button>
+            <button data-v="noturno" aria-pressed="false">Noturno</button>
+            <button data-v="foto" aria-pressed="false">Foto</button>
+            <button data-v="fotoTexto" aria-pressed="false">Foto e texto</button>
+            <button data-v="tweet" aria-pressed="false">Tweet</button>
+            <button data-v="tweetEscuro" aria-pressed="false">Tweet escuro</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="brand">Cor da marca</label>
+          <div class="swatches" id="swatches">
+            <input type="color" id="brand" value="#5B3DF5" aria-label="Escolher outra cor">
+          </div>
+        </div>
+        <div class="field">
+          <label for="handle">Seu @ ou nome</label>
+          <input type="text" id="handle" value="@seuperfil" maxlength="40">
+        </div>
+        <div id="tweetOpts" hidden>
+          <div class="field">
+            <label for="name">Nome no tweet</label>
+            <input type="text" id="name" value="Seu Nome" maxlength="40">
+          </div>
+          <div class="field actions">
+            <button type="button" id="avatarBtn">Foto de perfil</button>
+            <label class="check"><input type="checkbox" id="verified" checked> Selo de verificado</label>
+          </div>
+          <input type="file" id="avatarFile" accept="image/*" hidden>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="h-img">
+        <h2 id="h-img">Imagens</h2>
+        <p class="hint" style="margin:0 0 12px">Ao gerar, o app busca uma foto para cada slide. Para trocar, buscar outro termo ou ajustar, use “Editar textos”. Aparecem nos estilos Foto, Foto e texto e Tweet.</p>
+        <div class="exports">
+          <button id="photosAll" type="button">Buscar fotos para todos os slides</button>
+          <button id="upMany" type="button">Subir fotos da galeria</button>
+          <button id="clearImgs" type="button">Remover todas as imagens</button>
+        </div>
+        <input type="file" id="fileMany" accept="image/*" multiple hidden>
+        <p class="note" id="imgNote" role="status" aria-live="polite"></p>
+        <p class="note"><a href="https://www.pexels.com" target="_blank" rel="noopener">Fotos fornecidas pelo Pexels</a></p>
+      </section>
+
+      <section class="panel" aria-labelledby="h-exp">
+        <h2 id="h-exp">Baixar e postar</h2>
+        <div class="exports" id="exports">
+          <button id="dlZip">Baixar todos os slides (PNG em ZIP)</button>
+          <button id="dlPdf">Baixar PDF para o LinkedIn</button>
+        </div>
+        <p class="note" id="dlNote"></p>
+        <div class="field">
+          <label for="caption">Legenda</label>
+          <textarea id="caption"></textarea>
+          <div class="actions" style="margin-top:8px">
+            <button id="copy">Copiar legenda</button>
+            <span class="note" id="copyNote" role="status" aria-live="polite"></span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <main>
+      <div class="stage-head">
+        <h2 style="margin:0">Prévia</h2>
+        <span class="badge" id="badge">Exemplo: gere o seu ao lado</span>
+      </div>
+      <div class="strip" id="strip" aria-label="Slides do carrossel"></div>
+      <button class="primary gallery" id="gallery" type="button">Salvar na galeria do celular</button>
+      <p class="note" id="galleryNote" role="status" aria-live="polite"></p>
+      <h2 style="margin-top:12px">Editar textos</h2>
+      <div class="editor" id="editor"></div>
+    </main>
+  </div>
+</div>
+
+<script>
+const DISPLAY = '"Bricolage Grotesque","Arial Black",sans-serif';
+const SERIF = '"Fraunces",Georgia,serif';
+const BODY = '"Figtree","Helvetica Neue",Arial,sans-serif';
+const FORMATS = {"4:5":[1080,1350],"1:1":[1080,1080],"9:16":[1080,1920]};
+const SWATCHES = ["#5B3DF5","#0F7B6C","#E5484D","#F5A524","#0B63CE","#111318"];
+
+const state = {
+  format:"4:5", template:"solido", brand:"#5B3DF5", handle:"@seuperfil", name:"Seu Nome", verified:true, avatar:null,
+  slides:[
+    {titulo:"5 erros que travam o crescimento da sua loja online", texto:"O quarto é o mais comum, e quase ninguém percebe.", busca:"online store laptop shopping"},
+    {titulo:"Foto ruim de produto", texto:"O cliente não toca no produto. A foto é a única prova que ele tem. Luz natural e fundo neutro já mudam o jogo.", busca:"product photography studio"},
+    {titulo:"Frete escondido até o fim", texto:"Surpresa no checkout é a maior causa de carrinho abandonado. Mostre o frete ainda na página do produto.", busca:"online checkout delivery boxes"},
+    {titulo:"Site lento no celular", texto:"A maioria das compras começa no celular. Cada segundo a mais de carregamento derruba a conversão.", busca:"person waiting phone frustrated"},
+    {titulo:"Não falar com quem já comprou", texto:"Vender de novo para um cliente custa bem menos do que conquistar um novo. Tenha uma régua de e-mail ou WhatsApp pós-compra.", busca:"customer receiving package smiling"},
+    {titulo:"Decidir no achismo", texto:"Sem olhar os dados, você investe no que parece bom. Acompanhe taxa de conversão, ticket médio e recompra toda semana.", busca:"business analytics laptop"},
+    {titulo:"Qual desses acontece aí?", texto:"Comenta o número e salva este post para revisar depois.", busca:"friends talking coffee"}
+  ],
+  caption:"Sua loja até tem visitas, mas as vendas não acompanham? Na maioria das vezes, o problema está em um destes 5 pontos.\n\nSalve para revisar com calma e marque quem precisa ver isso.\n\n#ecommerce #lojavirtual #empreendedorismo #marketingdigital",
+  isExample:true
+};
+
+/* ---------- color helpers ---------- */
+function hexToRgb(h){h=h.replace("#","");if(h.length===3)h=h.split("").map(c=>c+c).join("");const n=parseInt(h,16);return[(n>>16)&255,(n>>8)&255,n&255]}
+function rgbToHex(r,g,b){return"#"+[r,g,b].map(v=>Math.round(v).toString(16).padStart(2,"0")).join("")}
+function lum(h){const c=hexToRgb(h).map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)});return .2126*c[0]+.7152*c[1]+.0722*c[2]}
+function mix(a,b,t){const x=hexToRgb(a),y=hexToRgb(b);return rgbToHex(x[0]+(y[0]-x[0])*t,x[1]+(y[1]-x[1])*t,x[2]+(y[2]-x[2])*t)}
+function onColor(h){return lum(h)>0.45?"#15171C":"#FFFFFF"}
+function brandOnLight(h){let c=h;for(let i=0;i<6&&lum(c)>0.32;i++)c=mix(c,"#000000",.18);return c}
+function brandOnDark(h){let c=h;for(let i=0;i<6&&lum(c)<0.12;i++)c=mix(c,"#FFFFFF",.22);return c}
+
+/* ---------- text layout ---------- */
+function wrapLines(ctx,text,maxW){
+  const out=[];
+  for(const para of String(text||"").split(/\n/)){
+    if(!para.trim()){if(out.length&&out[out.length-1]!=="")out.push("");continue}
+    const words=para.split(/\s+/).filter(Boolean);let line="";
+    for(const w of words){const t=line?line+" "+w:w;if(!line||ctx.measureText(t).width<=maxW)line=t;else{out.push(line);line=w}}
+    if(line)out.push(line);
+  }
+  while(out.length&&out[out.length-1]==="")out.pop();
+  return out;
+}
+function fit(ctx,text,o){
+  const lh=o.lh||1.2;
+  for(let s=o.max;s>=o.min;s-=2){
+    const font=`${o.weight} ${s}px ${o.family}`;ctx.font=font;
+    const lines=wrapLines(ctx,text,o.maxW);
+    const widest=lines.reduce((m,l)=>Math.max(m,ctx.measureText(l).width),0);
+    if(lines.length*s*lh<=o.maxH&&widest<=o.maxW)return{lines,size:s,h:lines.length*s*lh,font,lh};
+  }
+  const font=`${o.weight} ${o.min}px ${o.family}`;ctx.font=font;
+  const lines=wrapLines(ctx,text,o.maxW);
+  return{lines,size:o.min,h:lines.length*o.min*lh,font,lh};
+}
+function drawBlock(ctx,b,x,y,color,align){
+  if(!b||!b.lines.length)return;
+  ctx.font=b.font;ctx.fillStyle=color;ctx.textBaseline="top";ctx.textAlign=align||"left";
+  b.lines.forEach((l,i)=>ctx.fillText(l,x,y+i*b.size*b.lh+(b.size*(b.lh-1))/2));
+  ctx.textAlign="left";
+}
+function txt(ctx,s,x,y,font,color,align){ctx.font=font;ctx.fillStyle=color;ctx.textBaseline="alphabetic";ctx.textAlign=align||"left";ctx.fillText(s,x,y);ctx.textAlign="left"}
+function rrect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+
+/* ---------- templates ---------- */
+/* ---------- imagens: helpers ---------- */
+function hexToHsl(h){const [r,g,b]=hexToRgb(h).map(v=>v/255);const mx=Math.max(r,g,b),mn=Math.min(r,g,b);let hh=0,s=0;const l=(mx+mn)/2;if(mx!==mn){const d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);hh=mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4;hh*=60}return[hh,s,l]}
+function hslToHex(h,s,l){const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));return rgbToHex(f(0)*255,f(8)*255,f(4)*255)}
+function hexA(h,a){const[r,g,b]=hexToRgb(h);return`rgba(${r},${g},${b},${a})`}
+function rng(seed){let t0=seed>>>0;return()=>{t0=(t0+0x6D2B79F5)>>>0;let t=t0;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296}}
+function palette(brand,r){const[h,s0]=hexToHsl(brand);const s=Math.min(.9,Math.max(.45,s0));const c=(d,l)=>hslToHex(((h+d)%360+360)%360,s,l);return[brand,c(25+r()*35,.62),c(-35-r()*35,.5),c(180,.55),c(10,.88),c(0,.14)]}
+function genArt(brand,seed){
+  const W=1080,H=1350,c=document.createElement("canvas");c.width=W;c.height=H;const ctx=c.getContext("2d"),r=rng(seed),p=palette(brand,r),style=seed%4;
+  if(style===0){ctx.fillStyle=p[5];ctx.fillRect(0,0,W,H);
+    for(let k=0;k<7;k++){const x=r()*W,y=r()*H,rad=320+r()*620,g=ctx.createRadialGradient(x,y,0,x,y,rad),col=p[k%5];g.addColorStop(0,hexA(col,.85));g.addColorStop(1,hexA(col,0));ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}}
+  else if(style===1){const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,p[4]);g.addColorStop(1,p[1]);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    for(let k=0;k<6;k++){const y0=H*(.2+k*.13),amp=40+r()*90,fr=1+r()*1.5,ph=r()*6.3;ctx.beginPath();ctx.moveTo(0,H);for(let x=0;x<=W;x+=20)ctx.lineTo(x,y0+Math.sin(x/W*Math.PI*2*fr+ph)*amp);ctx.lineTo(W,H);ctx.closePath();ctx.fillStyle=hexA([p[0],p[2],p[3],p[5],p[1]][k%5],.8);ctx.fill()}}
+  else if(style===2){const cols=4,cs=W/cols,rows=Math.ceil(H/cs);
+    for(let gy=0;gy<rows;gy++)for(let gx=0;gx<cols;gx++){const x=gx*cs,y=gy*cs,a=p[Math.floor(r()*5)];let b=p[Math.floor(r()*5)];if(b===a)b=p[5];
+      ctx.fillStyle=a;ctx.fillRect(x,y,cs+1,cs+1);ctx.fillStyle=b;const t=Math.floor(r()*4);
+      ctx.save();ctx.beginPath();ctx.rect(x,y,cs,cs);ctx.clip();ctx.beginPath();
+      if(t===0)ctx.arc(x+cs/2,y+cs/2,cs*.38,0,Math.PI*2);
+      else if(t===1)ctx.arc(x+(r()<.5?0:cs),y+(r()<.5?0:cs),cs,0,Math.PI*2);
+      else if(t===2)ctx.arc(x+cs/2,y+cs,cs/2,Math.PI,0);
+      else ctx.rect(x+cs*.25,y+cs*.25,cs*.5,cs*.5);
+      ctx.fill();ctx.restore()}}
+  else{const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,p[0]);g.addColorStop(.55,p[1]);g.addColorStop(1,p[2]);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    const cx=W*(.2+r()*.6),cy=H*(.2+r()*.6);ctx.strokeStyle="rgba(255,255,255,.16)";ctx.lineWidth=6;for(let k=1;k<16;k++){ctx.beginPath();ctx.arc(cx,cy,k*70,0,Math.PI*2);ctx.stroke()}}
+  const id=ctx.getImageData(0,0,W,H),d=id.data;for(let k=0;k<d.length;k+=4){const nz=(r()-.5)*22;d[k]+=nz;d[k+1]+=nz;d[k+2]+=nz}ctx.putImageData(id,0,0);
+  return c;
+}
+function drawCover(ctx,img,x,y,w,h,rad){
+  const src=img.src,iw=src.width,ih=src.height;if(!iw||!ih)return;
+  const sc=Math.max(w/iw,h/ih)*(img.zoom||1),dw=iw*sc,dh=ih*sc,dx=x+(w-dw)*img.x,dy=y+(h-dh)*img.y;
+  ctx.save();if(rad)rrect(ctx,x,y,w,h,rad);else{ctx.beginPath();ctx.rect(x,y,w,h)}ctx.clip();ctx.drawImage(src,dx,dy,dw,dh);ctx.restore();
+}
+function tweetT(ctx,W,H,s,i,n,o,dark){
+  const bg=dark?"#000000":"#FFFFFF",fg=dark?"#E7E9EA":"#0F1419",sub=dark?"#71767B":"#536471";
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+  const P=90,cw=W-2*P,headH=118,gap=40,body=[s.titulo,s.texto].filter(x=>x&&x.trim()).join("\n\n");
+  const t=fit(ctx,body,{family:BODY,weight:500,maxW:cw,maxH:s.img?H*.3:H*.58,max:s.tipo==="capa"?64:56,min:30,lh:1.32});
+  let imgH=0;if(s.img)imgH=Math.max(H*.2,Math.min(cw,H-2*P-headH-gap*2-t.h-70));
+  const total=headH+gap+t.h+(s.img?gap+imgH:0),y=Math.max(P,(H-total)/2-20);
+  const ar=56,cx=P+ar,cy=y+ar;
+  if(o.avatar){ctx.save();ctx.beginPath();ctx.arc(cx,cy,ar,0,Math.PI*2);ctx.clip();drawCover(ctx,{src:o.avatar,zoom:1,x:.5,y:.5},cx-ar,cy-ar,ar*2,ar*2);ctx.restore()}
+  else{ctx.fillStyle=o.brand;ctx.beginPath();ctx.arc(cx,cy,ar,0,Math.PI*2);ctx.fill();txt(ctx,((o.name||"?").trim()[0]||"?").toUpperCase(),cx,cy+20,`700 56px ${BODY}`,onColor(o.brand),"center")}
+  const nx=P+ar*2+26,nm=o.name||"Seu Nome";txt(ctx,nm,nx,y+50,`700 40px ${BODY}`,fg);
+  if(o.verified){const bx=nx+ctx.measureText(nm).width+30,by=y+36;ctx.fillStyle="#1D9BF0";ctx.beginPath();ctx.arc(bx,by,19,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle="#FFFFFF";ctx.lineWidth=5;ctx.lineCap="round";ctx.lineJoin="round";ctx.beginPath();ctx.moveTo(bx-8,by);ctx.lineTo(bx-2,by+7);ctx.lineTo(bx+9,by-7);ctx.stroke()}
+  txt(ctx,o.handle,nx,y+100,`400 34px ${BODY}`,sub);
+  drawBlock(ctx,t,P,y+headH+gap,fg);
+  if(s.img){const iy=y+headH+gap+t.h+gap;drawCover(ctx,s.img,P,iy,cw,imgH,28);ctx.save();rrect(ctx,P,iy,cw,imgH,28);ctx.strokeStyle=dark?"#2F3336":"#CFD9DE";ctx.lineWidth=2;ctx.stroke();ctx.restore()}
+  txt(ctx,s.tipo==="capa"?"segue o fio →":`${i+1}/${n}`,W-P,H-64,`500 30px ${BODY}`,sub,"right");
+}
+
+const TEMPLATES = {
+  foto(ctx,W,H,s,i,n,o){
+    const P=90,cover=s.tipo==="capa";
+    if(s.img){drawCover(ctx,s.img,0,0,W,H);const d=s.img.dim;ctx.fillStyle=`rgba(0,0,0,${d*.5})`;ctx.fillRect(0,0,W,H);
+      const g=ctx.createLinearGradient(0,H*.3,0,H);g.addColorStop(0,"rgba(0,0,0,0)");g.addColorStop(1,`rgba(0,0,0,${Math.min(.92,.5+d*.6)})`);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+      const g2=ctx.createLinearGradient(0,0,0,H*.2);g2.addColorStop(0,"rgba(0,0,0,.35)");g2.addColorStop(1,"rgba(0,0,0,0)");ctx.fillStyle=g2;ctx.fillRect(0,0,W,H*.2)}
+    else{ctx.fillStyle=mix(o.brand,"#000000",.45);ctx.fillRect(0,0,W,H)}
+    txt(ctx,o.handle,P,P+20,`600 32px ${BODY}`,"#FFFFFF");
+    txt(ctx,`${i+1}/${n}`,W-P,P+20,`600 32px ${BODY}`,"#FFFFFF","right");
+    const t=fit(ctx,s.titulo,{family:DISPLAY,weight:800,maxW:W-2*P,maxH:H*.36,max:cover?124:96,min:48,lh:1.04});
+    const b=s.texto?fit(ctx,s.texto,{family:BODY,weight:500,maxW:W-2*P,maxH:H*.2,max:44,min:28,lh:1.35}):null;
+    const end=H-P-(cover?80:10),total=t.h+(b?32+b.h:0),y=end-total;
+    ctx.fillStyle=brandOnDark(o.brand);ctx.fillRect(P,y-40,110,10);
+    ctx.save();ctx.shadowColor="rgba(0,0,0,.4)";ctx.shadowBlur=16;
+    drawBlock(ctx,t,P,y,"#FFFFFF");if(b){ctx.globalAlpha=.92;drawBlock(ctx,b,P,y+t.h+32,"#FFFFFF");ctx.globalAlpha=1}
+    if(cover)txt(ctx,"arraste para o lado →",W-P,H-P+10,`600 32px ${BODY}`,"#FFFFFF","right");
+    ctx.restore();
+  },
+  fotoTexto(ctx,W,H,s,i,n,o){
+    const P=90,ih=Math.round(H*(H/W<1.1?.44:.5)),accent=brandOnLight(o.brand),cover=s.tipo==="capa";
+    ctx.fillStyle="#FFFFFF";ctx.fillRect(0,0,W,H);
+    if(s.img)drawCover(ctx,s.img,0,0,W,ih);else{ctx.fillStyle=o.brand;ctx.fillRect(0,0,W,ih)}
+    ctx.fillStyle=accent;ctx.fillRect(0,ih,W,12);
+    const lab=ih+12+76;
+    txt(ctx,cover?o.handle:`${String(i+1).padStart(2,"0")} / ${String(n).padStart(2,"0")}`,P,lab,`700 30px ${BODY}`,accent);
+    const top=lab+30,avail=H-top-110;
+    const t=fit(ctx,s.titulo,{family:DISPLAY,weight:800,maxW:W-2*P,maxH:avail*.5,max:cover?96:78,min:40,lh:1.06});
+    const b=s.texto?fit(ctx,s.texto,{family:BODY,weight:500,maxW:W-2*P,maxH:avail-t.h-28,max:42,min:26,lh:1.38}):null;
+    drawBlock(ctx,t,P,top,"#15171C");if(b)drawBlock(ctx,b,P,top+t.h+28,"#4A4F5C");
+    txt(ctx,cover?"arraste para o lado →":o.handle,cover?W-P:P,H-60,`600 28px ${BODY}`,"#6B7080",cover?"right":"left");
+  },
+  tweet(ctx,W,H,s,i,n,o){tweetT(ctx,W,H,s,i,n,o,false)},
+  tweetEscuro(ctx,W,H,s,i,n,o){tweetT(ctx,W,H,s,i,n,o,true)},
+  solido(ctx,W,H,s,i,n,o){
+    const P=96, full=s.tipo!=="conteudo";
+    if(full){
+      const fg=onColor(o.brand);
+      ctx.fillStyle=o.brand;ctx.fillRect(0,0,W,H);
+      ctx.globalAlpha=.85;txt(ctx,o.handle,P,P+30,`600 34px ${BODY}`,fg);ctx.globalAlpha=1;
+      const t=fit(ctx,s.titulo,{family:DISPLAY,weight:800,maxW:W-2*P,maxH:H*.46,max:s.tipo==="capa"?136:112,min:54,lh:1.04});
+      const b=s.texto?fit(ctx,s.texto,{family:BODY,weight:500,maxW:W-2*P,maxH:H*.2,max:46,min:28,lh:1.32}):null;
+      const total=t.h+(b?40+b.h:0);let y=Math.max(P+80,(H-total)/2);
+      drawBlock(ctx,t,P,y,fg);
+      if(b){ctx.globalAlpha=.9;drawBlock(ctx,b,P,y+t.h+40,fg);ctx.globalAlpha=1}
+      ctx.fillStyle=fg;ctx.fillRect(P,H-P-6,120,8);
+      txt(ctx,s.tipo==="capa"?"arraste para o lado →":`${i+1}/${n}`,W-P,H-P,`600 32px ${BODY}`,fg,"right");
+    }else{
+      const accent=brandOnLight(o.brand);
+      ctx.fillStyle="#FFFFFF";ctx.fillRect(0,0,W,H);
+      txt(ctx,String(i).padStart(2,"0"),P-6,P+110,`800 140px ${DISPLAY}`,accent);
+      const top=P+170, foot=150;
+      const t=fit(ctx,s.titulo,{family:DISPLAY,weight:800,maxW:W-2*P,maxH:(H-top-foot)*.42,max:92,min:48,lh:1.08});
+      const b=fit(ctx,s.texto,{family:BODY,weight:500,maxW:W-2*P,maxH:H-top-foot-t.h-40,max:48,min:28,lh:1.4});
+      drawBlock(ctx,t,P,top,"#15171C");
+      drawBlock(ctx,b,P,top+t.h+36,"#4A4F5C");
+      ctx.fillStyle=accent;ctx.fillRect(0,H-18,W*(i+1)/n,18);
+      txt(ctx,o.handle,P,H-P+10,`600 30px ${BODY}`,"#6B7080");
+      txt(ctx,`${i+1}/${n}`,W-P,H-P+10,`600 30px ${BODY}`,"#6B7080","right");
+    }
+  },
+  editorial(ctx,W,H,s,i,n,o){
+    const P=96, ink="#201E1B", soft="#55514A", bg="#F4F3EF", accent=brandOnLight(o.brand);
+    ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+    if(s.tipo!=="conteudo"){
+      ctx.fillStyle=accent;ctx.fillRect(P,P,140,10);
+      txt(ctx,o.handle,P,P+70,`600 32px ${BODY}`,soft);
+      const t=fit(ctx,s.titulo,{family:SERIF,weight:700,maxW:W-2*P,maxH:H*.48,max:s.tipo==="capa"?132:108,min:52,lh:1.06});
+      const b=s.texto?fit(ctx,s.texto,{family:BODY,weight:500,maxW:W-2*P-40,maxH:H*.18,max:42,min:28,lh:1.4}):null;
+      const end=H-P-110;const total=t.h+(b?44+b.h:0);const y=Math.max(P+120,end-total);
+      drawBlock(ctx,t,P,y,ink);
+      if(b)drawBlock(ctx,b,P,y+t.h+44,soft);
+      ctx.fillStyle=ink;ctx.fillRect(P,H-P-40,W-2*P,2);
+      txt(ctx,s.tipo==="capa"?"arraste para o lado →":"obrigado pela leitura",P,H-P+8,`500 30px ${BODY}`,soft);
+      txt(ctx,`${i+1}/${n}`,W-P,H-P+8,`600 30px ${BODY}`,soft,"right");
+    }else{
+      const x=P+52;
+      ctx.fillStyle=accent;ctx.fillRect(P,P,10,H-2*P);
+      txt(ctx,`${String(i+1).padStart(2,"0")} / ${String(n).padStart(2,"0")}`,x,P+30,`600 30px ${BODY}`,accent);
+      const top=P+110, foot=P+70;
+      const t=fit(ctx,s.titulo,{family:SERIF,weight:600,maxW:W-x-P,maxH:(H-top-foot)*.45,max:90,min:46,lh:1.1});
+      const b=fit(ctx,s.texto,{family:BODY,weight:400,maxW:W-x-P,maxH:H-top-foot-t.h-44,max:46,min:28,lh:1.45});
+      drawBlock(ctx,t,x,top,ink);
+      drawBlock(ctx,b,x,top+t.h+44,soft);
+      txt(ctx,o.handle,x,H-P,`600 28px ${BODY}`,soft);
+    }
+  },
+  noturno(ctx,W,H,s,i,n,o){
+    const P=96, bg="#111318", fg="#F4F5F8", soft="#B6BBC7", accent=brandOnDark(o.brand);
+    ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+    if(s.tipo!=="conteudo"){
+      ctx.fillStyle=accent;ctx.beginPath();
+      if(s.tipo==="capa")ctx.arc(W*.92,H*.08,W*.42,0,Math.PI*2);else ctx.arc(W*.05,H*.98,W*.4,0,Math.PI*2);
+      ctx.fill();
+      txt(ctx,o.handle,P,P+30,`600 32px ${BODY}`,s.tipo==="capa"?soft:soft);
+      const t=fit(ctx,s.titulo,{family:DISPLAY,weight:800,maxW:W-2*P,maxH:H*.42,max:s.tipo==="capa"?128:108,min:52,lh:1.04});
+      const b=s.texto?fit(ctx,s.texto,{family:BODY,weight:500,maxW:W-2*P,maxH:H*.18,max:44,min:28,lh:1.35}):null;
+      const total=t.h+(b?40+b.h:0);const y=s.tipo==="capa"?Math.max(H*.42,H-P-140-total):Math.max(P+100,H*.2);
+      drawBlock(ctx,t,P,y,fg);
+      if(b)drawBlock(ctx,b,P,y+t.h+40,soft);
+      txt(ctx,s.tipo==="capa"?"arraste para o lado →":`${i+1}/${n}`,W-P,H-P,`600 32px ${BODY}`,fg,"right");
+    }else{
+      const label=`${i+1}/${n}`;ctx.font=`700 34px ${BODY}`;const lw=ctx.measureText(label).width+44;
+      ctx.fillStyle=accent;rrect(ctx,P,P,lw,64,32);ctx.fill();
+      txt(ctx,label,P+lw/2,P+44,`700 34px ${BODY}`,onColor(accent),"center");
+      const top=P+130, foot=P+70;
+      const t=fit(ctx,s.titulo,{family:DISPLAY,weight:800,maxW:W-2*P,maxH:(H-top-foot)*.42,max:92,min:46,lh:1.06});
+      const b=fit(ctx,s.texto,{family:BODY,weight:500,maxW:W-2*P,maxH:H-top-foot-t.h-40,max:46,min:28,lh:1.42});
+      drawBlock(ctx,t,P,top,fg);
+      drawBlock(ctx,b,P,top+t.h+40,soft);
+      txt(ctx,o.handle,P,H-P,`600 28px ${BODY}`,soft);
+    }
+  }
+};
+
+/* ---------- rendering ---------- */
+const strip=document.getElementById("strip"), editor=document.getElementById("editor");
+let canvases=[];
+function setTypes(){const n=state.slides.length;state.slides.forEach((s,i)=>s.tipo=i===0?"capa":i===n-1?"cta":"conteudo")}
+function renderSlide(i){
+  const c=canvases[i];if(!c)return;const [W,H]=FORMATS[state.format];
+  if(c.width!==W)c.width=W;if(c.height!==H)c.height=H;
+  const ctx=c.getContext("2d");ctx.clearRect(0,0,W,H);
+  TEMPLATES[state.template](ctx,W,H,state.slides[i],i,state.slides.length,{brand:state.brand,handle:state.handle||"",name:state.name,verified:state.verified,avatar:state.avatar});
+  c.setAttribute("aria-label",`Slide ${i+1}: ${state.slides[i].titulo}`);
+  schedulePrepare();
+}
+function renderAll(){canvases.forEach((_,i)=>renderSlide(i))}
+function buildAll(){
+  setTypes();
+  strip.innerHTML="";editor.innerHTML="";canvases=[];
+  state.slides.forEach((s,i)=>{
+    const c=document.createElement("canvas");c.setAttribute("role","img");strip.appendChild(c);canvases.push(c);
+    const card=document.createElement("div");card.className="card";
+    const name=i===0?"Capa":i===state.slides.length-1?"Chamada final":`Slide ${i+1}`;
+    card.innerHTML=`<div class="card-head"><strong>${name}</strong><button type="button">Salvar este slide</button></div>
+      <input type="text" aria-label="Título do slide ${i+1}">
+      <textarea aria-label="Texto do slide ${i+1}"></textarea>
+      <div class="imgbox"></div>`;
+    const [inp,ta]=[card.querySelector("input"),card.querySelector("textarea")];
+    inp.value=s.titulo;ta.value=s.texto;
+    inp.addEventListener("input",()=>{s.titulo=inp.value;markEdited();renderSlide(i)});
+    ta.addEventListener("input",()=>{s.texto=ta.value;markEdited();renderSlide(i)});
+    card.querySelector("button").addEventListener("click",()=>saveToGallery(i));
+    editor.appendChild(card);
+    wireImgBox(card.querySelector(".imgbox"),i);
+  });
+  state.slides.forEach((_,i)=>renderImgControls(i));
+  renderAll();
+  document.getElementById("caption").value=state.caption;
+  document.getElementById("badge").textContent=state.isExample?"Exemplo: gere o seu ao lado":`${state.slides.length} slides`;
+}
+function markEdited(){if(state.isExample){state.isExample=false;document.getElementById("badge").textContent=`${state.slides.length} slides`}}
+
+/* ---------- controls ---------- */
+function segment(id,key){
+  const el=document.getElementById(id);
+  el.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+    el.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
+    state[key]=b.dataset.v;renderAll();if(key==="template")updateTplUI()});
+}
+segment("fmt","format");segment("tpl","template");
+const brandInput=document.getElementById("brand"), sw=document.getElementById("swatches");
+SWATCHES.forEach(c=>{const b=document.createElement("button");b.type="button";b.className="sw";b.style.background=c;b.dataset.c=c;b.setAttribute("aria-label",`Cor ${c}`);b.setAttribute("aria-pressed",String(c===state.brand));sw.insertBefore(b,brandInput)});
+function setBrand(c){state.brand=c;state.slides.forEach(s=>{if(s.img&&s.img.kind==="arte")s.img.src=genArt(c,s.img.seed)});brandInput.value=c;sw.querySelectorAll(".sw").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.c.toLowerCase()===c.toLowerCase())));renderAll()}
+sw.addEventListener("click",e=>{const b=e.target.closest(".sw");if(b)setBrand(b.dataset.c)});
+brandInput.addEventListener("input",()=>setBrand(brandInput.value));
+document.getElementById("handle").addEventListener("input",e=>{state.handle=e.target.value;renderAll()});
+document.getElementById("caption").addEventListener("input",e=>{state.caption=e.target.value});
+
+/* ---------- imagens: controles ---------- */
+const IMG_TPL=new Set(["foto","fotoTexto","tweet","tweetEscuro"]);
+const imgNote=document.getElementById("imgNote"),fileMany=document.getElementById("fileMany"),fileOne=document.createElement("input");
+fileOne.type="file";fileOne.accept="image/*";fileOne.hidden=true;document.body.appendChild(fileOne);
+let pendingSlide=null;
+async function loadImageFile(file){
+  let src;
+  try{src=await createImageBitmap(file)}catch(e){
+    src=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=fr.result};fr.onerror=rej;fr.readAsDataURL(file)})}
+  const iw=src.naturalWidth||src.width,ih=src.naturalHeight||src.height,sc=Math.min(1,2160/Math.max(iw,ih));
+  const c=document.createElement("canvas");c.width=Math.round(iw*sc);c.height=Math.round(ih*sc);c.getContext("2d").drawImage(src,0,0,c.width,c.height);
+  if(src.close)src.close();
+  return c;
+}
+function newImg(src,kind,seed){return{src,kind,seed,zoom:1,x:.5,y:.5,dim:kind==="arte"?.15:.3}}
+function setTemplate(v){state.template=v;document.querySelectorAll("#tpl button").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.v===v)));renderAll();updateTplUI()}
+function ensureImageTemplate(){if(IMG_TPL.has(state.template))return false;setTemplate("foto");return true}
+function updateTplUI(){document.getElementById("tweetOpts").hidden=!state.template.startsWith("tweet");state.slides.forEach((_,i)=>renderImgControls(i))}
+function esc(t){return String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function renderImgControls(i){
+  const box=editor.querySelectorAll(".imgbox")[i];if(!box)return;const s=state.slides[i],im=s.img;
+  const sl=(k,label,min,max)=>`<label>${label}<input type="range" data-k="${k}" min="${min}" max="${max}" step="0.01" value="${im[k]}"></label>`;
+  box.innerHTML=`<div class="psearch"><input type="text" data-f="q" value="${esc(s.busca||"")}" placeholder="Buscar foto, ex.: coffee shop" aria-label="Termo de busca de foto do slide ${i+1}"><button type="button" data-a="search">Buscar</button></div>`
+    +(s.results&&s.results.length?`<div class="thumbs">${s.results.map((p,k)=>`<button type="button" data-a="pick" data-idx="${k}" aria-pressed="${k===s.resIdx}" aria-label="Usar foto ${k+1}"><img src="${esc(p.src.tiny)}" alt="${esc(p.alt||"")}" loading="lazy"></button>`).join("")}</div>`:"")
+    +`<div class="img-actions"><button type="button" data-a="up">Foto da galeria</button>${im?'<button type="button" data-a="rm">Remover imagem</button>':""}</div>`
+    +(im?`<div class="sliders">${sl("zoom","Zoom",1,3)}${sl("x","Horizontal",0,1)}${sl("y","Vertical",0,1)}${state.template==="foto"?sl("dim","Escurecer",0,.8):""}</div>`:"")
+    +(im&&im.credit?`<p class="credit">Foto: <a href="${esc(im.credit.url)}" target="_blank" rel="noopener">${esc(im.credit.name)}</a> no Pexels</p>`:"")
+    +'<p class="note pnote" role="status" aria-live="polite"></p>'
+    +(!IMG_TPL.has(state.template)?'<p class="hint">Este estilo não mostra imagens. Escolha Foto, Foto e texto ou Tweet.</p>':"");
+}
+function wireImgBox(box,i){
+  const note=t=>{const n=box.querySelector(".pnote");if(n)n.textContent=t};
+  const doSearch=async()=>{
+    const q=((box.querySelector('[data-f="q"]')||{}).value||"").trim();if(!q)return;
+    if(!cfg.pexels){note("Adicione a chave do Pexels em Configuração para buscar fotos.");return}
+    const b=box.querySelector('[data-a="search"]');b.disabled=true;b.textContent="Buscando…";
+    try{const found=await searchSlide(i,q);if(found)ensureImageTemplate();renderSlide(i);renderImgControls(i);if(!found)note("Nada encontrado. Tente termos em inglês, como “coffee shop”.")}
+    catch(e){renderImgControls(i);note(e&&e.message||"Não foi possível buscar agora.")}
+  };
+  box.addEventListener("click",async e=>{const b=e.target.closest("[data-a]");if(!b)return;const s=state.slides[i],a=b.dataset.a;
+    if(a==="up"){pendingSlide=i;fileOne.value="";fileOne.click()}
+    else if(a==="search")doSearch();
+    else if(a==="pick"){box.querySelectorAll('[data-a="pick"]').forEach(x=>x.setAttribute("aria-pressed",String(x===b)));note("Carregando foto…");
+      try{await usePhoto(i,+b.dataset.idx);ensureImageTemplate();renderSlide(i);renderImgControls(i)}catch(err){note("Não foi possível carregar essa foto.")}}
+    else if(a==="rm"){s.img=null;s.resIdx=-1;renderSlide(i);renderImgControls(i)}});
+  box.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.dataset&&e.target.dataset.f==="q"){e.preventDefault();doSearch()}});
+  box.addEventListener("input",e=>{const d=e.target.dataset||{},s=state.slides[i];if(d.f==="q"){s.busca=e.target.value;return}if(!d.k||!s.img)return;s.img[d.k]=+e.target.value;renderSlide(i)});
+}
+fileOne.addEventListener("change",async()=>{const f=fileOne.files&&fileOne.files[0],i=pendingSlide;if(!f||i==null||!state.slides[i])return;
+  try{state.slides[i].img=newImg(await loadImageFile(f),"foto");const sw=ensureImageTemplate();imgNote.textContent=sw?"Mudei para o estilo Foto para mostrar a imagem.":"";renderSlide(i);renderImgControls(i)}
+  catch(e){imgNote.textContent="Não foi possível abrir essa imagem. Tente outra."}});
+document.getElementById("upMany").addEventListener("click",()=>{fileMany.value="";fileMany.click()});
+fileMany.addEventListener("change",async()=>{
+  const files=[...(fileMany.files||[])];if(!files.length)return;
+  imgNote.textContent="Carregando fotos…";
+  let start=state.slides.findIndex(s=>!s.img);if(start<0)start=0;
+  let placed=0;
+  for(const f of files){const i=start+placed;if(i>=state.slides.length)break;try{state.slides[i].img=newImg(await loadImageFile(f),"foto");placed++}catch(e){}}
+  if(!placed){imgNote.textContent="Não foi possível abrir essas imagens.";return}
+  const sw=ensureImageTemplate();renderAll();state.slides.forEach((_,i)=>renderImgControls(i));
+  imgNote.textContent=`${placed} ${placed>1?"fotos colocadas":"foto colocada"} a partir do slide ${start+1}.`+(files.length>placed?" As que sobraram não couberam no carrossel.":"")+(sw?" Mudei para o estilo Foto para mostrar as imagens.":"");
+});
+document.getElementById("photosAll").addEventListener("click",async e=>{const b=e.currentTarget;b.disabled=true;try{await fetchPhotosAll()}catch(err){}finally{b.disabled=false}});
+document.getElementById("clearImgs").addEventListener("click",()=>{state.slides.forEach(s=>s.img=null);renderAll();state.slides.forEach((_,i)=>renderImgControls(i));imgNote.textContent=""});
+document.getElementById("name").addEventListener("input",e=>{state.name=e.target.value;renderAll()});
+document.getElementById("verified").addEventListener("change",e=>{state.verified=e.target.checked;renderAll()});
+const avatarFile=document.getElementById("avatarFile");
+document.getElementById("avatarBtn").addEventListener("click",()=>{avatarFile.value="";avatarFile.click()});
+avatarFile.addEventListener("change",async()=>{const f=avatarFile.files&&avatarFile.files[0];if(!f)return;try{state.avatar=await loadImageFile(f);renderAll()}catch(e){}});
+
+/* ---------- geração de texto ---------- */
+const $=id=>document.getElementById(id);
+const statusEl=$("status"), genBtn=$("gen"), stopBtn=$("stop");
+function setStatus(t,err){statusEl.textContent=t;statusEl.classList.toggle("err",!!err)}
+let ctl=null;
+
+/* configuração: as chaves ficam só no navegador deste aparelho */
+const CFG_KEY="gira-config";
+const cfg=Object.assign({provider:"gemini",gemini:"",geminiModel:"gemini-flash-latest",claude:"",claudeModel:"claude-sonnet-5-5",pexels:""},(()=>{try{return JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}catch(e){return{}}})());
+function saveCfg(){try{localStorage.setItem(CFG_KEY,JSON.stringify(cfg))}catch(e){}}
+["gemini","geminiModel","claude","claudeModel","pexels"].forEach(k=>{const el=$("cfg-"+k);el.value=cfg[k]||"";el.addEventListener("input",()=>{cfg[k]=el.value.trim();saveCfg();updateSetupUI()})});
+function updateSetupUI(){
+  const p=cfg.provider;
+  $("provGemini").hidden=p!=="gemini";$("provClaude").hidden=p!=="claude";$("provManual").hidden=p!=="manual";$("manualBox").hidden=p!=="manual";
+  genBtn.textContent=p==="manual"?"Copiar pedido para o chat":"Gerar carrossel";
+  const ready=p==="manual"||(p==="gemini"&&cfg.gemini)||(p==="claude"&&cfg.claude);
+  $("setupSummary").textContent=`${p==="gemini"?"Gemini":p==="claude"?"Claude":"Colar roteiro"}${ready?"":" (falta a chave)"}, fotos ${cfg.pexels?"ativadas":"sem chave do Pexels"}`;
+}
+function setProvider(v){cfg.provider=v;saveCfg();document.querySelectorAll("#prov button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===v)));updateSetupUI()}
+$("prov").addEventListener("click",e=>{const b=e.target.closest("button");if(b)setProvider(b.dataset.v)});
+setProvider(cfg.provider);
+if(!cfg.gemini&&!cfg.claude&&!cfg.pexels)$("setup").open=true;
+
+function buildPrompt(topic,n,tone){
+  const extra=state.template.startsWith("tweet")?"\n- Estilo thread do Twitter: escreva como tweets em primeira pessoa, com linguagem natural e direta. O campo titulo é a frase de abertura do tweet e o campo texto é o complemento.":"";
+  return `Você é um copywriter especialista em carrosséis para Instagram e LinkedIn no Brasil.
+Crie um carrossel com exatamente ${n} slides a partir do conteúdo abaixo. Se for um texto longo, extraia as ideias principais; se for só um tema, desenvolva com informações úteis e específicas.
+
+Tom: ${tone}.
+
+Regras:
+- Slide 1 (capa): título com gancho forte que gere curiosidade, até 10 palavras; "texto" com um subtítulo de até 14 palavras.
+- Slides 2 a ${n-1}: uma ideia por slide. "titulo" com até 7 palavras; "texto" com 18 a 35 palavras, concreto e prático.
+- Slide ${n} (fechamento): chamada para ação clara (salvar, comentar, compartilhar ou seguir). "titulo" até 7 palavras, "texto" até 20 palavras.
+- Português do Brasil, frases curtas, sem emojis, sem hashtags e sem numeração dentro dos slides.${extra}
+- "busca_foto": em cada slide, 2 a 5 palavras EM INGLÊS para buscar num banco de fotos uma cena real e concreta que ilustre o slide (pessoas, objetos, lugares, ações). Evite conceitos abstratos. Exemplo: "woman packing online orders". Varie as cenas entre os slides.
+- "legenda": texto para a publicação, 2 a 4 frases curtas, terminando com uma chamada para ação.
+- "hashtags": 4 a 6 hashtags relevantes, em minúsculas.
+
+Responda apenas com JSON, sem nenhum texto antes ou depois, neste formato:
+{"slides":[{"titulo":"...","texto":"...","busca_foto":"..."}],"legenda":"...","hashtags":["#exemplo"]}
+
+Conteúdo:
+"""
+${topic}
+"""`;
+}
+function parseJSON(text){const t=String(text||"").replace(/```json|```/g,"").trim(),a=t.indexOf("{"),b=t.lastIndexOf("}");if(a<0||b<a)throw new Error("json");return JSON.parse(t.slice(a,b+1))}
+async function callGemini(prompt,signal){
+  const model=encodeURIComponent(cfg.geminiModel||"gemini-flash-latest");
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:"POST",signal,headers:{"Content-Type":"application/json","x-goog-api-key":cfg.gemini},
+    body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",temperature:.8}})});
+  if(!r.ok){const e=await r.json().catch(()=>({})),m=(e.error&&e.error.message)||"";
+    throw new Error(r.status===429?"O limite gratuito do Gemini foi atingido por agora. Espere um pouco e tente de novo.":(r.status===403||/api key|API_KEY/i.test(m))?"O Gemini recusou a chave. Confira em Configuração.":r.status===404?"Modelo do Gemini não encontrado. Confira o nome em Configuração.":`O Gemini respondeu com erro (${r.status}). ${m}`.trim())}
+  const d=await r.json();return((d.candidates&&d.candidates[0]&&d.candidates[0].content&&d.candidates[0].content.parts)||[]).map(p=>p.text||"").join("");
+}
+async function callClaude(prompt,signal){
+  const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",signal,headers:{"content-type":"application/json","x-api-key":cfg.claude,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:cfg.claudeModel||"claude-sonnet-5-5",max_tokens:4000,messages:[{role:"user",content:prompt}]})});
+  if(!r.ok){const e=await r.json().catch(()=>({})),m=(e.error&&e.error.message)||"";
+    throw new Error(r.status===401?"A API do Claude recusou a chave. Confira em Configuração.":r.status===429?"Limite da API do Claude atingido. Espere um pouco e tente de novo.":r.status===404?"Modelo do Claude não encontrado. Confira o nome em Configuração.":`A API do Claude respondeu com erro (${r.status}). ${m}`.trim())}
+  const d=await r.json();return(d.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("");
+}
+async function applyData(data,signal){
+  const slides=(Array.isArray(data&&data.slides)?data.slides:[]).map(x=>({titulo:String((x&&x.titulo)||"").trim(),texto:String((x&&x.texto)||"").trim(),busca:String((x&&(x.busca_foto||x.busca))||"").trim()})).filter(x=>x.titulo||x.texto).slice(0,10);
+  if(slides.length<3)throw new Error("A resposta veio incompleta. Tente gerar de novo.");
+  const tags=(Array.isArray(data.hashtags)?data.hashtags:[]).map(t=>String(t).trim()).filter(Boolean).map(t=>t.startsWith("#")?t:"#"+t);
+  state.slides=slides;state.caption=[String(data.legenda||"").trim(),tags.join(" ")].filter(Boolean).join("\n\n");state.isExample=false;
+  buildAll();strip.scrollLeft=0;
+  if(window.innerWidth<960)strip.scrollIntoView({block:"start"});
+  if(cfg.pexels)await fetchPhotosAll(signal);
+}
+async function copyText(t){try{await navigator.clipboard.writeText(t);return true}catch(e){return false}}
+genBtn.addEventListener("click",async()=>{
+  const topic=$("topic").value.trim();
+  if(!topic){setStatus("Escreva um tema ou cole um texto para gerar o carrossel.",true);$("topic").focus();return}
+  const n=+$("count").value,tone=$("tone").selectedOptions[0].textContent,prompt=buildPrompt(topic,n,tone);
+  if(cfg.provider==="manual"){
+    $("manualPrompt").value=prompt;
+    const ok=await copyText(prompt);
+    setStatus(ok?"Pedido copiado. Cole num chat de IA, copie a resposta inteira e cole no campo abaixo.":"Copie o pedido abaixo, cole num chat de IA e traga a resposta de volta.");
+    if(!ok){$("manualPrompt").focus();$("manualPrompt").select()}
+    return;
+  }
+  const key=cfg.provider==="gemini"?cfg.gemini:cfg.claude;
+  if(!key){setStatus("Adicione a chave da IA em Configuração, ou escolha “Colar roteiro”.",true);$("setup").open=true;$("setup").scrollIntoView({block:"start"});return}
+  genBtn.disabled=true;ctl=new AbortController();stopBtn.hidden=false;setStatus("Escrevendo os slides…");
+  try{
+    const text=cfg.provider==="gemini"?await callGemini(prompt,ctl.signal):await callClaude(prompt,ctl.signal);
+    let data;try{data=parseJSON(text)}catch(e){throw new Error("A resposta veio incompleta. Toque em Gerar carrossel de novo.")}
+    await applyData(data,ctl.signal);
+    setStatus(`Pronto: ${state.slides.length} slides. Ajuste o que quiser abaixo.`);
+  }catch(e){
+    if(e&&e.name==="AbortError")setStatus("Geração interrompida.");
+    else setStatus(e&&e.message&&!/fetch|network|load failed/i.test(e.message)?e.message:"Sem conexão com o serviço. Confira a internet e tente de novo.",true);
+  }finally{genBtn.disabled=false;stopBtn.hidden=true;ctl=null}
+});
+stopBtn.addEventListener("click",()=>ctl&&ctl.abort());
+$("buildManual").addEventListener("click",async()=>{
+  try{const data=parseJSON($("manualPaste").value);await applyData(data);setStatus(`Pronto: ${state.slides.length} slides. Ajuste o que quiser abaixo.`)}
+  catch(e){setStatus(e&&e.message&&e.message!=="json"&&!/JSON|token/i.test(e.message)?e.message:"Não reconheci a resposta. Cole o texto inteiro que o chat devolveu, começando em {.",true)}
+});
+
+/* ---------- fotos do Pexels ---------- */
+function orient(){return state.format==="1:1"?"square":"portrait"}
+async function pexelsSearch(q,signal){
+  const r=await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=12&orientation=${orient()}`,{headers:{Authorization:cfg.pexels},signal});
+  if(r.status===401||r.status===403)throw new Error("O Pexels recusou a chave. Confira em Configuração.");
+  if(r.status===429)throw new Error("Limite de buscas do Pexels atingido por agora. Tente mais tarde.");
+  if(!r.ok)throw new Error(`O Pexels respondeu com erro (${r.status}).`);
+  const d=await r.json();return d.photos||[];
+}
+async function loadRemote(url,signal){
+  try{const r=await fetch(url,{signal});if(!r.ok)throw new Error("img");return await loadImageFile(await r.blob())}
+  catch(e){if(e&&e.name==="AbortError")throw e;
+    const im=await new Promise((res,rej)=>{const x=new Image();x.crossOrigin="anonymous";x.onload=()=>res(x);x.onerror=rej;x.src=url});
+    const sc=Math.min(1,2160/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement("canvas");c.width=Math.round(im.naturalWidth*sc);c.height=Math.round(im.naturalHeight*sc);c.getContext("2d").drawImage(im,0,0,c.width,c.height);return c}
+}
+async function usePhoto(i,k,signal){
+  const s=state.slides[i],p=s.results&&s.results[k];if(!p)return;
+  const c=await loadRemote(p.src.large2x||p.src.large||p.src.original,signal);
+  const dim=s.img?s.img.dim:null;
+  s.resIdx=k;s.img=newImg(c,"foto");if(dim!=null)s.img.dim=dim;s.img.credit={name:p.photographer,url:p.url,id:p.id};
+}
+async function searchSlide(i,q,signal,avoid){
+  const s=state.slides[i];s.busca=q;s.results=await pexelsSearch(q,signal);
+  if(!s.results.length)return false;
+  let k=s.results.findIndex(p=>!avoid||!avoid.has(p.id));if(k<0)k=0;
+  await usePhoto(i,k,signal);if(avoid)avoid.add(s.results[k].id);return true;
+}
+async function fetchPhotosAll(signal){
+  if(!cfg.pexels){imgNote.textContent="Adicione a chave do Pexels em Configuração para buscar fotos.";return}
+  const avoid=new Set(),n=state.slides.length;let ok=0,err=null;
+  for(let i=0;i<n;i++){
+    const s=state.slides[i],q=s.busca||s.titulo;if(!q)continue;
+    const msg=`Buscando foto ${i+1} de ${n}…`;setStatus(msg);imgNote.textContent=msg;
+    try{if(await searchSlide(i,q,signal,avoid))ok++}
+    catch(e){if(e&&e.name==="AbortError")throw e;err=e;if(/chave|Limite/.test(e.message||""))break}
+  }
+  if(ok)ensureImageTemplate();
+  renderAll();state.slides.forEach((_,i)=>renderImgControls(i));
+  const fin=ok?`${ok} de ${n} slides com foto do Pexels.`+(err?" "+err.message:""):(err?err.message:"Nenhuma foto encontrada. Tente outros termos em cada slide.");
+  imgNote.textContent=fin;setStatus(fin,!ok);
+}
+
+/* ---------- exports ---------- */
+const dlNote=document.getElementById("dlNote");
+const downloadsPromise=Promise.resolve(null);
+
+function slug(){return (state.slides[0]?.titulo||"carrossel").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40)||"carrossel"}
+function toBlob(c,type,q){return new Promise(r=>c.toBlob(r,type||"image/png",q))}
+async function save(filename,data){
+  const d=await downloadsPromise;
+  if(!d){
+    try{const u=URL.createObjectURL(data instanceof Blob?data:new Blob([data]));const a=document.createElement("a");a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);return true}catch(e){return false}
+  }
+  try{await d.save({filename,data});dlNote.textContent="";return true}
+  catch(e){if(e&&e.code==="declined")return false;dlNote.textContent=e&&e.code==="rate_limited"?"Espere a confirmação anterior e tente de novo.":"Não foi possível baixar agora.";return false}
+}
+
+/* ---------- salvar na galeria (menu de compartilhar do celular) ---------- */
+const galleryNote=document.getElementById("galleryNote");
+let shareFiles=null, prepTimer=null, prepGen=0;
+function schedulePrepare(){shareFiles=null;clearTimeout(prepTimer);prepTimer=setTimeout(prepareShare,500)}
+async function prepareShare(){
+  const g=++prepGen, name=slug(), files=[];
+  for(let i=0;i<canvases.length;i++){const b=await toBlob(canvases[i]);files.push(new File([b],`${name}-${String(i+1).padStart(2,"0")}.png`,{type:"image/png"}))}
+  if(g===prepGen)shareFiles=files;
+}
+function canShareFiles(f){try{return !!(navigator.share&&navigator.canShare&&navigator.canShare({files:f}))}catch(e){return false}}
+async function saveToGallery(idx){
+  let files=shareFiles;
+  if(!files){galleryNote.textContent="Preparando as imagens…";await document.fonts.ready;renderAll();clearTimeout(prepTimer);await prepareShare();files=shareFiles;galleryNote.textContent=""}
+  if(!files)return;
+  const pick=idx==null?files:[files[idx]];
+  if(canShareFiles(pick)){
+    try{await navigator.share({files:pick});galleryNote.textContent="";return}
+    catch(e){
+      if(e&&e.name==="AbortError")return;
+      if(e&&e.name==="NotAllowedError"){galleryNote.textContent="As imagens estão prontas. Toque de novo em “Salvar”.";return}
+    }
+  }
+  galleryNote.textContent=pick.length>1?"Aqui o celular não abriu o menu de salvar imagens, então os slides serão baixados um a um. Confirme cada um.":"";
+  for(const f of pick){const ok=await save(f.name,f);if(!ok)break}
+}
+document.getElementById("gallery").addEventListener("click",()=>saveToGallery(null));
+document.getElementById("dlZip").addEventListener("click",async e=>{
+  const b=e.currentTarget;b.disabled=true;dlNote.textContent="Preparando o ZIP…";
+  try{renderAll();const zip=new JSZip();
+    for(let i=0;i<canvases.length;i++)zip.file(`${String(i+1).padStart(2,"0")}.png`,await toBlob(canvases[i]));
+    dlNote.textContent="";await save(`${slug()}.zip`,await zip.generateAsync({type:"blob"}));
+  }catch(err){dlNote.textContent="Não foi possível montar o ZIP."}finally{b.disabled=false}
+});
+document.getElementById("dlPdf").addEventListener("click",async e=>{
+  const b=e.currentTarget;b.disabled=true;dlNote.textContent="Preparando o PDF…";
+  try{renderAll();const [W,H]=FORMATS[state.format];const w=W*.75,h=H*.75;
+    const doc=new window.jspdf.jsPDF({unit:"pt",format:[w,h],orientation:w>h?"landscape":"portrait",compress:true});
+    canvases.forEach((c,i)=>{if(i)doc.addPage([w,h],w>h?"landscape":"portrait");doc.addImage(c.toDataURL("image/jpeg",.92),"JPEG",0,0,w,h)});
+    dlNote.textContent="";await save(`${slug()}.pdf`,doc.output("blob"));
+  }catch(err){dlNote.textContent="Não foi possível montar o PDF."}finally{b.disabled=false}
+});
+document.getElementById("copy").addEventListener("click",async()=>{
+  const ta=document.getElementById("caption"), note=document.getElementById("copyNote");
+  try{await navigator.clipboard.writeText(ta.value);note.textContent="Legenda copiada."}
+  catch(e){ta.select();try{document.execCommand("copy");note.textContent="Legenda copiada."}catch(_){note.textContent="Selecione o texto e copie manualmente."}}
+  setTimeout(()=>note.textContent="",2500);
+});
+
+/* ---------- start ---------- */
+buildAll();
+Promise.all([
+  document.fonts.load(`800 100px "Bricolage Grotesque"`),
+  document.fonts.load(`700 100px "Fraunces"`),document.fonts.load(`600 100px "Fraunces"`),
+  document.fonts.load(`500 40px "Figtree"`),document.fonts.load(`600 40px "Figtree"`),document.fonts.load(`400 40px "Figtree"`)
+]).catch(()=>{}).finally(()=>renderAll());
+</script>
+</body>
+</html>
