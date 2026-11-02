@@ -804,10 +804,73 @@ genBtn.addEventListener("click",async()=>{
 });
 stopBtn.addEventListener("click",()=>ctl&&ctl.abort());
 /* modo sem chave: abrir o chat já com o pedido e colar a resposta de volta */
-const CHAT_SUFFIX="\n\nImportante: coloque o JSON dentro de um único bloco de código ```json, sem nenhum texto fora dele, para que eu possa copiar com um toque.";
+const CHAT_END="FIM DO PEDIDO";
+function buildChatPrompt(topic,n,tone){
+  const extra=state.template.startsWith("tweet")?"\n- Escreva como uma thread do Twitter, em primeira pessoa, com linguagem natural e direta.":"";
+  return `Você é um copywriter especialista em carrosséis para Instagram e LinkedIn no Brasil.
+Crie um carrossel com exatamente ${n} slides sobre o conteúdo no fim desta mensagem. Se for um texto longo, extraia as ideias principais; se for só um tema, desenvolva com informações úteis e específicas.
+
+Tom: ${tone}.
+
+Regras:
+- Slide 1 (capa): título com gancho forte que gere curiosidade, até 10 palavras; texto com um subtítulo de até 14 palavras.
+- Slides 2 a ${n-1}: uma ideia por slide. Título com até 7 palavras; texto com 18 a 35 palavras, concreto e prático.
+- Slide ${n} (fechamento): chamada para ação clara (salvar, comentar, compartilhar ou seguir). Título até 7 palavras, texto até 20 palavras.
+- Português do Brasil, frases curtas, sem emojis, sem hashtags e sem numeração dentro dos slides.${extra}
+- FOTO: 2 a 5 palavras EM INGLÊS descrevendo uma cena real e concreta para buscar num banco de fotos (pessoas, objetos, lugares). Exemplo: woman reading bible.
+- LEGENDA: 2 a 4 frases curtas para a publicação, terminando com uma chamada para ação.
+- HASHTAGS: 4 a 6 hashtags relevantes, em minúsculas.
+
+Responda somente em texto simples, sem tabelas, sem negrito e sem comentários, exatamente neste formato:
+
+SLIDE 1
+TÍTULO: (título do slide)
+TEXTO: (texto do slide)
+FOTO: (busca em inglês)
+
+(repita para cada slide, até o SLIDE ${n})
+
+LEGENDA: (legenda)
+HASHTAGS: (hashtags)
+
+Conteúdo:
+"""
+${topic}
+"""
+${CHAT_END}`;
+}
+/* Lê a resposta em texto simples (SLIDE / TÍTULO / TEXTO / FOTO). Ignora o pedido e os exemplos. */
+function isPlaceholder(v){v=String(v||"").trim();return !v||/^[.…\s]+$/.test(v)||/^\(.*\)$/.test(v)}
+function parseSlidesText(chunk){
+  const t=chunk.replace(/\r/g,"").replace(/\*\*|__/g,"").replace(/^[ \t]*#{1,6}[ \t]+/gm,"").replace(/^[ \t]*[-•>][ \t]*/gm,"");
+  const lines=t.split("\n"),slides=[];let cur=null,field=null,leg=[],tags=[],sect=null;
+  const head=/^[\s=*\-]*slide\s*\d+\b[^a-zà-ú]*$/i, kv=/^\s*(t[íi]tulo|texto|foto|legenda|hashtags?)\s*[:：\-–]\s*(.*)$/i;
+  for(const ln of lines){
+    if(head.test(ln)){cur={titulo:"",texto:"",busca:""};slides.push(cur);field=null;sect=null;continue}
+    const m=ln.match(kv);
+    if(m){const k=m[1].toLowerCase(),v=m[2].trim();
+      if(k.startsWith("legenda")){sect="leg";leg=v?[v]:[];field=null;continue}
+      if(k.startsWith("hashtag")){sect="tags";tags=v?[v]:[];field=null;continue}
+      if(cur&&sect===null){field=k.startsWith("t")&&k!=="texto"?"titulo":k==="texto"?"texto":"busca";cur[field]=v;continue}
+    }
+    if(!ln.trim())continue;
+    if(sect==="leg")leg.push(ln.trim());else if(sect==="tags")tags.push(ln.trim());else if(cur&&field)cur[field]+=(cur[field]?" ":"")+ln.trim();
+  }
+  const good=slides.filter(x=>!(isPlaceholder(x.titulo)&&isPlaceholder(x.texto))).map(x=>({titulo:isPlaceholder(x.titulo)?"":x.titulo,texto:isPlaceholder(x.texto)?"":x.texto,busca_foto:isPlaceholder(x.busca)?"":x.busca}));
+  const legenda=leg.join(" ").trim(),hashtags=(tags.join(" ").match(/#[\p{L}\p{N}_]+/gu)||[]);
+  return{slides:good,legenda:isPlaceholder(legenda)?"":legenda,hashtags};
+}
+function parseChatResponse(text){
+  const raw=String(text||"").trim();if(!raw)throw new Error("vazio");
+  const parts=raw.split(CHAT_END);
+  if(parts.length>1&&!parts.slice(1).join("").trim())throw new Error("pedido");
+  for(let i=parts.length-1;i>=0;i--){const d=parseSlidesText(parts[i]);if(d.slides.length>=3)return d}
+  try{const d=parseJSON(parts[parts.length-1]);if(d.slides&&d.slides.length>=3)return d}catch(e){}
+  throw new Error("formato");
+}
 const CHAT_URL={chatgpt:q=>"https://chatgpt.com/?q="+encodeURIComponent(q),claude:q=>"https://claude.ai/new?q="+encodeURIComponent(q),gemini:()=>"https://gemini.google.com/app"};
 let awaitingChat=false;
-function chatPrompt(){const topic=$("topic").value.trim();if(!topic)return null;return buildPrompt(topic,+$("count").value,$("tone").selectedOptions[0].textContent)+CHAT_SUFFIX}
+function chatPrompt(){const topic=$("topic").value.trim();if(!topic)return null;return buildChatPrompt(topic,+$("count").value,$("tone").selectedOptions[0].textContent)}
 function copyNow(t){let ok=false;try{const ta=document.createElement("textarea");ta.value=t;ta.setAttribute("readonly","");ta.style.cssText="position:fixed;top:0;left:0;opacity:0";document.body.appendChild(ta);ta.select();ta.setSelectionRange(0,t.length);ok=document.execCommand("copy");ta.remove()}catch(e){}
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).catch(()=>{});return ok}
 $("chats").addEventListener("click",e=>{
@@ -820,17 +883,18 @@ $("chats").addEventListener("click",e=>{
 });
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&awaitingChat&&cfg.provider==="manual"){setStatus("Copiou a resposta do chat? Toque em “Colar resposta e montar”.");$("pasteManual").scrollIntoView({block:"center",behavior:"smooth"})}});
 async function buildFromManual(){
-  try{const data=parseJSON($("manualPaste").value);await applyData(data);awaitingChat=false;setStatus(`Pronto: ${state.slides.length} slides. Ajuste o que quiser abaixo.`)}
+  try{const data=parseChatResponse($("manualPaste").value);await applyData(data);awaitingChat=false;setStatus(`Pronto: ${state.slides.length} slides. Ajuste o que quiser abaixo.`)}
   catch(e){
-    if(e&&e.message==="vazio"){setStatus("Nada para montar ainda. Copie a resposta no chat e toque em “Colar resposta e montar”.",true);return}
-    setStatus(e&&e.message&&e.message!=="json"&&!/JSON|token/i.test(e.message)?e.message:"Não reconheci a resposta. Copie a resposta inteira do chat (use o botão de copiar do próprio chat) e cole de novo.",true)}
+    const m=e&&e.message;
+    if(m==="vazio"){setStatus("Nada para montar ainda. Copie a resposta no chat e toque em “Colar resposta e montar”.",true);return}
+    if(m==="pedido"){setStatus("O que está copiado ainda é o pedido, não a resposta. No chat, envie o pedido, espere a resposta, toque em copiar embaixo dela e volte.",true);return}
+    setStatus("Não achei os slides no que foi colado. No chat, toque em copiar embaixo da resposta e tente de novo.",true)}
 }
 $("buildManual").addEventListener("click",buildFromManual);
 $("manualPaste").addEventListener("paste",()=>setTimeout(()=>{if($("manualPaste").value.trim())buildFromManual()},50));
 $("pasteManual").addEventListener("click",async()=>{
   let t="";try{t=await navigator.clipboard.readText()}catch(e){}
   if(!t.trim()){document.querySelector("details.more").open=true;setStatus("Não consegui ler o que você copiou. Toque e segure no campo abaixo e escolha Colar.",true);$("manualPaste").focus();return}
-  if(t.trim()===$("manualPrompt").value.trim()){setStatus("Isso ainda é o pedido. No chat, copie a resposta dele e toque aqui de novo.",true);return}
   $("manualPaste").value=t;buildFromManual();
 });
 
