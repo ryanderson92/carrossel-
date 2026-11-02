@@ -1,5 +1,7 @@
 name: Publicar no GitHub Pages
 
+# Publica a versão oficial (branch main) na raiz do site
+# e a versão de teste (branch teste) em /teste/.
 on:
   push:
     branches: [main]
@@ -12,7 +14,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -21,17 +23,28 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Baixar o código
+      - name: Baixar a versão oficial (main)
         uses: actions/checkout@v4
+        with:
+          ref: main
+          path: oficial
+
+      - name: Baixar a versão de teste (teste)
+        id: teste
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: teste
+          path: teste
 
       - name: Configurar o Pages
         uses: actions/configure-pages@v5
 
-      - name: Preparar os arquivos do site
+      - name: Montar o site
         run: |
-          mkdir -p _site
-          cp index.html manifest.json sw.js _site/
-          cp -r icons _site/
+          PASTA_TESTE=""
+          if [ "${{ steps.teste.outcome }}" = "success" ]; then PASTA_TESTE=teste; fi
+          bash oficial/.github/scripts/montar-site.sh oficial "$PASTA_TESTE" _site
 
       - name: Enviar os arquivos
         uses: actions/upload-pages-artifact@v3

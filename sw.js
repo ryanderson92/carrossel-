@@ -1,6 +1,8 @@
 // Service worker do Gira: guarda os arquivos do app para abrir mais rápido.
 // As APIs (IA e fotos) NUNCA passam pelo cache.
-const CACHE = "gira-v1";
+// Oficial e teste ficam no mesmo endereço: cada um usa o próprio cache.
+const ENV = self.registration.scope.includes("/teste/") ? "gira-teste" : "gira";
+const CACHE = ENV + "-v1";
 const APP_FILES = [
   "./",
   "./index.html",
@@ -28,7 +30,7 @@ self.addEventListener("install", event => {
 self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k.startsWith(ENV + "-v") && k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -40,6 +42,8 @@ self.addEventListener("fetch", event => {
   // Chamadas de IA e de fotos: direto para a rede, sem cache.
   if (NEVER_CACHE.some(host => url.hostname === host || url.hostname.endsWith("." + host))) return;
   if (!/^https?:$/.test(url.protocol)) return;
+  // A versão oficial não mexe nos arquivos da versão de teste.
+  if (ENV === "gira" && url.origin === self.location.origin && url.pathname.includes("/teste/")) return;
 
   const sameOrigin = url.origin === self.location.origin;
   const isFont = url.hostname === "fonts.googleapis.com" || url.hostname === "fonts.gstatic.com";
