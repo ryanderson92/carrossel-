@@ -212,6 +212,7 @@ details.setup[open] summary h2::after{content:" ▴"}
             <label for="manualPaste">Cole aqui a resposta do chat</label>
             <textarea id="manualPaste" placeholder="A resposta começa com {&quot;slides&quot;"></textarea>
           </div>
+          <button id="pasteManual" type="button" style="margin-top:10px;width:100%">Colar resposta e montar</button>
           <button id="buildManual" type="button" style="margin-top:10px;width:100%">Montar carrossel</button>
         </div>
       </section>
@@ -705,7 +706,33 @@ Conteúdo:
 ${topic}
 """`;
 }
-function parseJSON(text){const t=String(text||"").replace(/```json|```/g,"").trim(),a=t.indexOf("{"),b=t.lastIndexOf("}");if(a<0||b<a)throw new Error("json");return JSON.parse(t.slice(a,b+1))}
+/* Lê o JSON da resposta da IA, tolerando texto antes/depois, blocos ```, vírgulas sobrando e aspas curvas. */
+function jsonCandidates(s){
+  const out=[],starts=[];
+  for(let i=0;i<s.length;i++)if(s[i]==="{"||s[i]==="[")starts.push(i);
+  const pref=s.search(/\{\s*["“”]slides["“”]/);if(pref>=0)starts.unshift(pref);
+  for(const a of starts){
+    let depth=0,inStr=false,esc=false;
+    for(let i=a;i<s.length;i++){const c=s[i];
+      if(inStr){if(esc)esc=false;else if(c==="\\")esc=true;else if(c==='"')inStr=false;continue}
+      if(c==='"')inStr=true;else if(c==="{"||c==="[")depth++;else if(c==="}"||c==="]"){depth--;if(!depth){out.push(s.slice(a,i+1));break}}
+    }
+    if(out.length>40)break;
+  }
+  return out;
+}
+function tryParse(c){for(const x of [c,c.replace(/,\s*([}\]])/g,"$1")]){try{return JSON.parse(x)}catch(e){}}return null}
+function parseJSON(text){
+  const t=String(text||"").replace(/```[a-zA-Z]*/g,"").trim();
+  if(!t)throw new Error("vazio");
+  for(const s of [t,t.replace(/[“”„‟″]/g,'"').replace(/[‘’]/g,"'")]){
+    for(const c of jsonCandidates(s)){const v=tryParse(c);
+      if(Array.isArray(v)&&v.length&&typeof v[0]==="object")return{slides:v};
+      if(v&&typeof v==="object"&&Array.isArray(v.slides))return v;
+    }
+  }
+  throw new Error("json");
+}
 async function callGemini(prompt,signal){
   const model=encodeURIComponent(cfg.geminiModel||"gemini-flash-latest");
   const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:"POST",signal,headers:{"Content-Type":"application/json","x-goog-api-key":cfg.gemini},
@@ -756,9 +783,18 @@ genBtn.addEventListener("click",async()=>{
   }finally{genBtn.disabled=false;stopBtn.hidden=true;ctl=null}
 });
 stopBtn.addEventListener("click",()=>ctl&&ctl.abort());
-$("buildManual").addEventListener("click",async()=>{
+async function buildFromManual(){
   try{const data=parseJSON($("manualPaste").value);await applyData(data);setStatus(`Pronto: ${state.slides.length} slides. Ajuste o que quiser abaixo.`)}
-  catch(e){setStatus(e&&e.message&&e.message!=="json"&&!/JSON|token/i.test(e.message)?e.message:"Não reconheci a resposta. Cole o texto inteiro que o chat devolveu, começando em {.",true)}
+  catch(e){
+    if(e&&e.message==="vazio"){setStatus("O campo “Cole aqui a resposta do chat” está vazio. Copie a resposta inteira no chat e cole nele, ou toque em “Colar resposta e montar”.",true);$("manualPaste").focus();return}
+    setStatus(e&&e.message&&e.message!=="json"&&!/JSON|token/i.test(e.message)?e.message:"Não reconheci a resposta. Copie a resposta inteira do chat (use o botão de copiar do próprio chat) e cole de novo.",true)}
+}
+$("buildManual").addEventListener("click",buildFromManual);
+$("manualPaste").addEventListener("paste",()=>setTimeout(()=>{if($("manualPaste").value.trim())buildFromManual()},50));
+$("pasteManual").addEventListener("click",async()=>{
+  let t="";try{t=await navigator.clipboard.readText()}catch(e){}
+  if(!t.trim()){setStatus("Não consegui ler a área de transferência. Toque e segure no campo “Cole aqui a resposta do chat” e escolha Colar.",true);$("manualPaste").focus();return}
+  $("manualPaste").value=t;buildFromManual();
 });
 
 /* ---------- fotos do Pexels ---------- */
