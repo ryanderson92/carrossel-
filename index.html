@@ -207,6 +207,16 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:14px}
             </select>
           </div>
         </div>
+        <div class="field">
+          <label for="estilo">Estilo do texto</label>
+          <select id="estilo">
+            <option value="lista">Lista de dicas</option>
+            <option value="narrativa">Narrativa (reflexão pessoal)</option>
+            <option value="historia">História com virada</option>
+            <option value="opiniao">Opinião</option>
+          </select>
+          <p class="hint" id="estiloHint"></p>
+        </div>
         <button class="primary" id="gen">Gerar carrossel</button>
         <div class="actions">
           <button class="link" id="stop" hidden>Parar</button>
@@ -489,7 +499,8 @@ const TEMPLATES = {
     }else{
       const accent=brandOnLight(o.brand);
       ctx.fillStyle="#FFFFFF";ctx.fillRect(0,0,W,H);
-      txt(ctx,String(i).padStart(2,"0"),P-6,P+110,`800 140px ${DISPLAY}`,accent);
+      if(o.estilo&&o.estilo!=="lista"){ctx.fillStyle=accent;ctx.fillRect(P,P+60,110,12)}
+      else txt(ctx,String(i).padStart(2,"0"),P-6,P+110,`800 140px ${DISPLAY}`,accent);
       const top=P+170, foot=150;
       const t=fit(ctx,s.titulo,{family:DISPLAY,weight:800,maxW:W-2*P,maxH:(H-top-foot)*.42,max:92,min:48,lh:1.08});
       const b=fit(ctx,s.texto,{family:BODY,weight:500,maxW:W-2*P,maxH:H-top-foot-t.h-40,max:48,min:28,lh:1.4});
@@ -562,7 +573,7 @@ function renderSlide(i){
   const c=canvases[i];if(!c)return;const [W,H]=FORMATS[state.format];
   if(c.width!==W)c.width=W;if(c.height!==H)c.height=H;
   const ctx=c.getContext("2d");ctx.clearRect(0,0,W,H);
-  TEMPLATES[state.template](ctx,W,H,state.slides[i],i,state.slides.length,{brand:state.brand,handle:state.handle||"",name:state.name,verified:state.verified,avatar:state.avatar});
+  TEMPLATES[state.template](ctx,W,H,state.slides[i],i,state.slides.length,{brand:state.brand,handle:state.handle||"",name:state.name,verified:state.verified,avatar:state.avatar,estilo:state.estilo});
   c.setAttribute("aria-label",`Slide ${i+1}: ${state.slides[i].titulo}`);
   schedulePrepare();
 }
@@ -702,6 +713,36 @@ $("prov").addEventListener("click",e=>{const b=e.target.closest("button");if(b)s
 setProvider(cfg.provider);
 if(!cfg.gemini&&!cfg.claude&&!cfg.pexels)$("setup").open=true;
 
+const ESTILOS={
+  lista:{hint:"Uma dica ou ideia por slide. Ex.: 5 erros que travam o crescimento de uma loja online.",
+    regras:n=>`- Slide 1 (capa): título com gancho forte que gere curiosidade, até 10 palavras; texto com um subtítulo de até 14 palavras.
+- Slides 2 a ${n-1}: uma ideia por slide. Título com até 7 palavras; texto com 18 a 35 palavras, concreto e prático.
+- Slide ${n} (fechamento): chamada para ação clara (salvar, comentar, compartilhar ou seguir). Título até 7 palavras, texto até 20 palavras.`},
+  narrativa:{hint:"Texto corrido em primeira pessoa, como quem conversa com o seguidor. Ex.: O que as eleições deste ano me fizeram refletir.",
+    regras:n=>`- Estilo narrativo: um relato pessoal e reflexivo em primeira pessoa, com voz humana e honesta, como quem conversa com o seguidor. Não é uma lista de dicas: os slides formam um único texto corrido, e cada slide continua o anterior e puxa para o próximo.
+- Slide 1 (capa): título é uma pergunta ou frase reflexiva que dá vontade de continuar lendo, até 12 palavras (exemplo: "O que as eleições deste ano me fizeram refletir"); texto com uma frase curta que abre a conversa, até 14 palavras.
+- Slides 2 a ${n-1}: a reflexão em sequência (o contexto, o que eu vi ou vivi, o que me incomodou ou me tocou, o que mudou no meu jeito de pensar). Título é a frase de destaque daquele trecho, até 8 palavras; texto com 25 a 45 palavras.
+- Slide ${n} (fechamento): a reflexão final e uma pergunta sincera para o leitor responder nos comentários. Título até 8 palavras, texto até 25 palavras.
+- Não invente fatos, números, nomes ou citações. Quando faltar informação, fale de percepções, sentimentos e aprendizados.
+- A legenda segue a mesma voz, em primeira pessoa.`},
+  historia:{hint:"Uma história com começo, conflito, virada e lição. Ex.: O dia em que quase desisti do meu negócio.",
+    regras:n=>`- Estilo storytelling: conte uma história com começo, conflito, virada e lição, em primeira pessoa (ou sobre a situação descrita no conteúdo).
+- Slide 1 (capa): gancho que começa no meio da cena ou no momento de tensão, até 12 palavras; texto com uma frase curta que gera suspense, até 14 palavras.
+- Slides 2 a ${n-1}: um momento da história por slide, em ordem; a virada acontece perto do fim. Título com a frase-chave do momento, até 8 palavras; texto com 20 a 40 palavras, com detalhes concretos da cena.
+- Slide ${n} (fechamento): a lição da história e uma chamada para ação. Título até 8 palavras, texto até 25 palavras.
+- Não invente fatos, números, nomes ou citações que não estejam no conteúdo.
+- A legenda segue a mesma voz da história.`},
+  opiniao:{hint:"Um ponto de vista claro, com argumentos e convite ao debate. Ex.: Por que eu parei de postar todo dia.",
+    regras:n=>`- Estilo opinião: defenda um ponto de vista claro em primeira pessoa, com argumentos e respeito a quem pensa diferente.
+- Slide 1 (capa): a opinião em forma de frase forte e curiosa, até 12 palavras; texto com uma frase curta que convida a ler, até 14 palavras.
+- Slides 2 a ${n-1}: um argumento por slide, com um exemplo concreto. Título até 8 palavras; texto com 20 a 40 palavras.
+- Slide ${n} (fechamento): conclusão e convite ao debate nos comentários. Título até 8 palavras, texto até 25 palavras.
+- Não invente fatos, números, nomes ou citações. Deixe claro o que é opinião.
+- A legenda segue a mesma voz, em primeira pessoa.`}
+};
+function estiloAtual(){const v=($("estilo")||{}).value;return ESTILOS[v]?v:"lista"}
+function updateEstiloHint(){const h=$("estiloHint");if(h)h.textContent=ESTILOS[estiloAtual()].hint}
+$("estilo").addEventListener("change",()=>{updateEstiloHint();state.estilo=estiloAtual();renderAll()});updateEstiloHint();
 function buildPrompt(topic,n,tone){
   const extra=state.template.startsWith("tweet")?"\n- Estilo thread do Twitter: escreva como tweets em primeira pessoa, com linguagem natural e direta. O campo titulo é a frase de abertura do tweet e o campo texto é o complemento.":"";
   return `Você é um copywriter especialista em carrosséis para Instagram e LinkedIn no Brasil.
@@ -710,9 +751,8 @@ Crie um carrossel com exatamente ${n} slides a partir do conteúdo abaixo. Se fo
 Tom: ${tone}.
 
 Regras:
-- Slide 1 (capa): título com gancho forte que gere curiosidade, até 10 palavras; "texto" com um subtítulo de até 14 palavras.
-- Slides 2 a ${n-1}: uma ideia por slide. "titulo" com até 7 palavras; "texto" com 18 a 35 palavras, concreto e prático.
-- Slide ${n} (fechamento): chamada para ação clara (salvar, comentar, compartilhar ou seguir). "titulo" até 7 palavras, "texto" até 20 palavras.
+- O campo "titulo" é o título do slide e o campo "texto" é o texto do slide.
+${ESTILOS[estiloAtual()].regras(n)}
 - Português do Brasil, frases curtas, sem emojis, sem hashtags e sem numeração dentro dos slides.${extra}
 - "busca_foto": em cada slide, 2 a 5 palavras EM INGLÊS para buscar num banco de fotos uma cena real e concreta que ilustre o slide (pessoas, objetos, lugares, ações). Evite conceitos abstratos. Exemplo: "woman packing online orders". Varie as cenas entre os slides.
 - "legenda": texto para a publicação, 2 a 4 frases curtas, terminando com uma chamada para ação.
@@ -813,9 +853,7 @@ Crie um carrossel com exatamente ${n} slides sobre o conteúdo no fim desta mens
 Tom: ${tone}.
 
 Regras:
-- Slide 1 (capa): título com gancho forte que gere curiosidade, até 10 palavras; texto com um subtítulo de até 14 palavras.
-- Slides 2 a ${n-1}: uma ideia por slide. Título com até 7 palavras; texto com 18 a 35 palavras, concreto e prático.
-- Slide ${n} (fechamento): chamada para ação clara (salvar, comentar, compartilhar ou seguir). Título até 7 palavras, texto até 20 palavras.
+${ESTILOS[estiloAtual()].regras(n)}
 - Português do Brasil, frases curtas, sem emojis, sem hashtags e sem numeração dentro dos slides.${extra}
 - FOTO: 2 a 5 palavras EM INGLÊS descrevendo uma cena real e concreta para buscar num banco de fotos (pessoas, objetos, lugares). Exemplo: woman reading bible.
 - LEGENDA: 2 a 4 frases curtas para a publicação, terminando com uma chamada para ação.
@@ -1016,6 +1054,7 @@ function importFromHash(){
     if(d.h!=null)state.handle=String(d.h);
     if(d.n!=null)state.name=String(d.n);
     state.verified=d.v!==false;
+    if(ESTILOS[d.e])state.estilo=d.e;
     state.caption=String(d.cap||"");
     state.slides=d.s.slice(0,10).map(x=>{const s={titulo:String(x[0]||""),texto:String(x[1]||""),busca:String(x[2]||"")};if(Number.isInteger(x[3]))s.img=newImg(genArt(state.brand,x[3]),"arte",x[3]);return s});
     state.isExample=false;
@@ -1032,6 +1071,7 @@ if(imported){
   setTemplate(state.template);
   brandInput.value=state.brand;sw.querySelectorAll(".sw").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.c.toLowerCase()===state.brand.toLowerCase())));
   $("handle").value=state.handle;$("name").value=state.name;$("verified").checked=state.verified;
+  if(state.estilo){$("estilo").value=state.estilo;updateEstiloHint();renderAll()}
   galleryNote.textContent="Carrossel recebido. Toque em “Salvar na galeria do celular” e escolha “Salvar imagens” para salvar todos de uma vez.";
   setTimeout(()=>$("gallery").scrollIntoView({block:"center"}),300);
 }
