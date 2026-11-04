@@ -211,7 +211,7 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:14px}
           <label for="estilo">Estilo do texto</label>
           <select id="estilo">
             <option value="lista">Lista de dicas</option>
-            <option value="narrativa">Narrativa (reflexão pessoal)</option>
+            <option value="narrativa">Narrativa (conversa com o leitor)</option>
             <option value="historia">História com virada</option>
             <option value="opiniao">Opinião</option>
           </select>
@@ -718,13 +718,20 @@ const ESTILOS={
     regras:n=>`- Slide 1 (capa): título com gancho forte que gere curiosidade, até 10 palavras; texto com um subtítulo de até 14 palavras.
 - Slides 2 a ${n-1}: uma ideia por slide. Título com até 7 palavras; texto com 18 a 35 palavras, concreto e prático.
 - Slide ${n} (fechamento): chamada para ação clara (salvar, comentar, compartilhar ou seguir). Título até 7 palavras, texto até 20 palavras.`},
-  narrativa:{hint:"Texto corrido em primeira pessoa, como quem conversa com o seguidor. Ex.: O que as eleições deste ano me fizeram refletir.",
-    regras:n=>`- Estilo narrativo: um relato pessoal e reflexivo em primeira pessoa, com voz humana e honesta, como quem conversa com o seguidor. Não é uma lista de dicas: os slides formam um único texto corrido, e cada slide continua o anterior e puxa para o próximo.
-- Slide 1 (capa): título é uma pergunta ou frase reflexiva que dá vontade de continuar lendo, até 12 palavras (exemplo: "O que as eleições deste ano me fizeram refletir"); texto com uma frase curta que abre a conversa, até 14 palavras.
-- Slides 2 a ${n-1}: a reflexão em sequência (o contexto, o que eu vi ou vivi, o que me incomodou ou me tocou, o que mudou no meu jeito de pensar). Título é a frase de destaque daquele trecho, até 8 palavras; texto com 25 a 45 palavras.
-- Slide ${n} (fechamento): a reflexão final e uma pergunta sincera para o leitor responder nos comentários. Título até 8 palavras, texto até 25 palavras.
-- Não invente fatos, números, nomes ou citações. Quando faltar informação, fale de percepções, sentimentos e aprendizados.
-- A legenda segue a mesma voz, em primeira pessoa.`},
+  narrativa:{hint:"Você conversando com uma pessoa só, em primeira pessoa, como num café. Ex.: O que as eleições deste ano me fizeram refletir?",
+    regras:n=>`- Estilo conversa: escreva como se eu estivesse sentado tomando um café com UMA pessoa e contando o que eu vivi e pensei. É uma conversa, não um texto de blog, não uma palestra e não uma lista de dicas.
+- Escreva em primeira pessoa ("eu", "me", "a gente") e fale com o leitor como uma pessoa só, chamando de "você". Nunca use "vocês", "pessoal", "galera" ou "seguidores".
+- O tom pedido só muda o clima da conversa (mais leve, mais sério, mais inspirador); a forma continua sendo uma conversa entre duas pessoas.
+- Linguagem falada do dia a dia no Brasil: frases curtas, "pra", "tá", "a gente", pausas naturais como "Sabe?", "E olha…", "Vou ser sincero com você".
+- Faça perguntas diretas ao leitor no meio do texto, como quem quer saber a opinião dele ("Já aconteceu com você?", "Você também sente isso?").
+- Os slides formam uma única conversa contínua: cada slide continua a frase ou a ideia do anterior e deixa vontade de passar para o próximo.
+- Os títulos não são manchetes nem tópicos: são frases que eu diria em voz alta naquele momento da conversa.
+- Slide 1 (capa): título é a pergunta ou frase que abre a conversa, até 12 palavras (exemplo: "O que as eleições deste ano me fizeram refletir?"); texto é um convite pessoal pra continuar, até 14 palavras (exemplo: "Senta aqui, quero te contar uma coisa.").
+- Slides 2 a ${n-1}: a conversa em sequência (o que eu vi ou vivi, o que me incomodou ou me tocou, o que mudou em mim). Título até 8 palavras; texto com 25 a 45 palavras.
+- Slide ${n} (fechamento): o que eu levo disso e uma pergunta sincera pra pessoa me responder nos comentários, como quem quer mesmo ouvir. Título até 8 palavras, texto até 25 palavras.
+- Exemplo só do jeito de falar (não copie o assunto): título "Eu também levantei a voz"; texto "E não me orgulho disso. Teve um almoço de domingo em que eu só queria ganhar a discussão. Já aconteceu com você? Aquela vontade de provar que o outro tá errado?"
+- Não invente fatos, números, nomes ou citações. Quando faltar informação, fale do que eu senti, percebi e aprendi.
+- A legenda também é conversa: em primeira pessoa, falando com "você", terminando com uma pergunta pra pessoa responder.`},
   historia:{hint:"Uma história com começo, conflito, virada e lição. Ex.: O dia em que quase desisti do meu negócio.",
     regras:n=>`- Estilo storytelling: conte uma história com começo, conflito, virada e lição, em primeira pessoa (ou sobre a situação descrita no conteúdo).
 - Slide 1 (capa): gancho que começa no meio da cena ou no momento de tensão, até 12 palavras; texto com uma frase curta que gera suspense, até 14 palavras.
