@@ -150,6 +150,7 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:14px}
             <button type="button" data-v="servidor" aria-pressed="false" id="provServidorBtn" hidden>Gira (sem chave)</button>
             <button type="button" data-v="gemini" aria-pressed="true">Gemini (grátis)</button>
             <button type="button" data-v="claude" aria-pressed="false">Claude</button>
+            <button type="button" data-v="openai" aria-pressed="false">ChatGPT (OpenAI)</button>
             <button type="button" data-v="manual" aria-pressed="false">Sem chave (usar um chat)</button>
           </div>
         </div>
@@ -173,6 +174,17 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:14px}
           <div class="field">
             <label for="cfg-claudeModel">Modelo do Claude</label>
             <input type="text" id="cfg-claudeModel" autocomplete="off">
+          </div>
+        </div>
+        <div id="provOpenai" hidden>
+          <div class="field">
+            <label for="cfg-openai">Chave da API da OpenAI</label>
+            <input type="password" id="cfg-openai" autocomplete="off" placeholder="Cole a chave aqui">
+            <p class="hint">Crie em <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a>. É cobrado por uso e é separado da assinatura do ChatGPT Plus: a conta da API precisa ter créditos.</p>
+          </div>
+          <div class="field">
+            <label for="cfg-openaiModel">Modelo da OpenAI</label>
+            <input type="text" id="cfg-openaiModel" autocomplete="off">
           </div>
         </div>
         <div id="provServidor" hidden>
@@ -706,16 +718,16 @@ let ctl=null;
 
 /* configuração: as chaves ficam só no navegador deste aparelho */
 const CFG_KEY="gira-config";
-const cfg=Object.assign({provider:"gemini",gemini:"",geminiModel:"gemini-flash-latest",claude:"",claudeModel:"claude-sonnet-5-5",pexels:"",codigo:""},(()=>{try{return JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}catch(e){return{}}})());
+const cfg=Object.assign({provider:"gemini",gemini:"",geminiModel:"gemini-flash-latest",claude:"",claudeModel:"claude-sonnet-5-5",openai:"",openaiModel:"gpt-5-mini",pexels:"",codigo:""},(()=>{try{return JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}catch(e){return{}}})());
 function saveCfg(){try{localStorage.setItem(CFG_KEY,JSON.stringify(cfg))}catch(e){}}
-["gemini","geminiModel","claude","claudeModel","pexels","codigo"].forEach(k=>{const el=$("cfg-"+k);el.value=cfg[k]||"";el.addEventListener("input",()=>{cfg[k]=el.value.trim();saveCfg();updateSetupUI()})});
+["gemini","geminiModel","claude","claudeModel","openai","openaiModel","pexels","codigo"].forEach(k=>{const el=$("cfg-"+k);el.value=cfg[k]||"";el.addEventListener("input",()=>{cfg[k]=el.value.trim();saveCfg();updateSetupUI()})});
 function updateSetupUI(){
   const p=cfg.provider;
-  $("provServidor").hidden=p!=="servidor";$("provGemini").hidden=p!=="gemini";$("provClaude").hidden=p!=="claude";$("provManual").hidden=p!=="manual";$("manualBox").hidden=p!=="manual";
+  $("provServidor").hidden=p!=="servidor";$("provGemini").hidden=p!=="gemini";$("provClaude").hidden=p!=="claude";$("provOpenai").hidden=p!=="openai";$("provManual").hidden=p!=="manual";$("manualBox").hidden=p!=="manual";
   genBtn.hidden=p==="manual";
   if(p==="servidor"){$("setupSummary").textContent=SERVER&&SERVER.convite&&!cfg.codigo?"Gira (falta o código de convite)":`Gira, sem chave${temFotos()?", com fotos":""}`;return}
-  const ready=p==="manual"||(p==="gemini"&&cfg.gemini)||(p==="claude"&&cfg.claude);
-  $("setupSummary").textContent=`${p==="gemini"?"Gemini":p==="claude"?"Claude":"Sem chave, usando um chat"}${ready?"":" (falta a chave)"}, fotos ${temFotos()?"ativadas":"sem chave do Pexels"}`;
+  const ready=p==="manual"||(p==="gemini"&&cfg.gemini)||(p==="claude"&&cfg.claude)||(p==="openai"&&cfg.openai);
+  $("setupSummary").textContent=`${p==="gemini"?"Gemini":p==="claude"?"Claude":p==="openai"?"ChatGPT (OpenAI)":"Sem chave, usando um chat"}${ready?"":" (falta a chave)"}, fotos ${temFotos()?"ativadas":"sem chave do Pexels"}`;
 }
 function setProvider(v){cfg.provider=v;saveCfg();document.querySelectorAll("#prov button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===v)));updateSetupUI()}
 $("prov").addEventListener("click",e=>{const b=e.target.closest("button");if(b)setProvider(b.dataset.v)});
@@ -729,12 +741,12 @@ async function detectServer(){
     const r=await fetch("api/status",{cache:"no-store"});if(!r.ok)return;
     const d=await r.json();if(!d||!d.ok||!d.ia)return;
     SERVER=d;$("provServidorBtn").hidden=false;$("codigoField").hidden=!d.convite;
-    if(PROV_INICIAL==="servidor"||(!cfg.gemini&&!cfg.claude))setProvider("servidor");else updateSetupUI();
+    if(PROV_INICIAL==="servidor"||(!cfg.gemini&&!cfg.claude&&!cfg.openai))setProvider("servidor");else updateSetupUI();
     $("setup").open=cfg.provider==="servidor"&&!!d.convite&&!cfg.codigo;
   }catch(e){}
 }
 setProvider(cfg.provider==="servidor"?"gemini":cfg.provider);
-if(!cfg.gemini&&!cfg.claude&&!cfg.pexels)$("setup").open=true;
+if(!cfg.gemini&&!cfg.claude&&!cfg.openai&&!cfg.pexels)$("setup").open=true;
 detectServer();
 
 const ESTILOS={
@@ -838,6 +850,13 @@ async function callGemini(prompt,signal){
     throw new Error(r.status===429?"O limite gratuito do Gemini foi atingido por agora. Espere um pouco e tente de novo.":(r.status===403||/api key|API_KEY/i.test(m))?"O Gemini recusou a chave. Confira em Configuração.":r.status===404?"Modelo do Gemini não encontrado. Confira o nome em Configuração.":`O Gemini respondeu com erro (${r.status}). ${m}`.trim())}
   const d=await r.json();return((d.candidates&&d.candidates[0]&&d.candidates[0].content&&d.candidates[0].content.parts)||[]).map(p=>p.text||"").join("");
 }
+async function callOpenAI(prompt,signal){
+  const r=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",signal,headers:{"Content-Type":"application/json","Authorization":"Bearer "+cfg.openai},
+    body:JSON.stringify({model:cfg.openaiModel||"gpt-5-mini",messages:[{role:"user",content:prompt}],response_format:{type:"json_object"}})});
+  if(!r.ok){const e=await r.json().catch(()=>({})),m=(e.error&&e.error.message)||"";
+    throw new Error(r.status===401?"A OpenAI recusou a chave. Confira em Configuração.":r.status===429?(/quota|billing|credit/i.test(m)?"A conta da API da OpenAI está sem créditos. Adicione créditos em platform.openai.com.":"Limite da OpenAI atingido. Espere um pouco e tente de novo."):r.status===404?"Modelo da OpenAI não encontrado. Confira o nome em Configuração.":`A OpenAI respondeu com erro (${r.status}). ${m}`.trim())}
+  const d=await r.json();return(d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content)||"";
+}
 async function callClaude(prompt,signal){
   const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",signal,headers:{"content-type":"application/json","x-api-key":cfg.claude,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
     body:JSON.stringify({model:cfg.claudeModel||"claude-sonnet-5-5",max_tokens:4000,messages:[{role:"user",content:prompt}]})});
@@ -869,12 +888,12 @@ genBtn.addEventListener("click",async()=>{
   if(cfg.provider==="servidor"){
     if(SERVER&&SERVER.convite&&!cfg.codigo){setStatus("Digite o código de convite em Configuração.",true);$("setup").open=true;$("setup").scrollIntoView({block:"start"});$("cfg-codigo").focus();return}
   }else{
-    const key=cfg.provider==="gemini"?cfg.gemini:cfg.claude;
+    const key=cfg.provider==="gemini"?cfg.gemini:cfg.provider==="openai"?cfg.openai:cfg.claude;
     if(!key){setStatus("Adicione a chave da IA em Configuração, ou escolha “Sem chave (usar um chat)”.",true);$("setup").open=true;$("setup").scrollIntoView({block:"start"});return}
   }
   genBtn.disabled=true;ctl=new AbortController();stopBtn.hidden=false;setStatus("Escrevendo os slides…");
   try{
-    const text=cfg.provider==="servidor"?await callServer(prompt,ctl.signal):cfg.provider==="gemini"?await callGemini(prompt,ctl.signal):await callClaude(prompt,ctl.signal);
+    const text=cfg.provider==="servidor"?await callServer(prompt,ctl.signal):cfg.provider==="gemini"?await callGemini(prompt,ctl.signal):cfg.provider==="openai"?await callOpenAI(prompt,ctl.signal):await callClaude(prompt,ctl.signal);
     let data;try{data=parseJSON(text)}catch(e){throw new Error("A resposta veio incompleta. Toque em Gerar carrossel de novo.")}
     await applyData(data,ctl.signal);
     setStatus(`Pronto: ${state.slides.length} slides. Ajuste o que quiser abaixo.`);

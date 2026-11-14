@@ -21,6 +21,16 @@ function dentroDoLimite(req, tipo, max) {
   return n <= max;
 }
 
+// Qual IA o servidor usa: IA_PROVEDOR ("gemini" ou "openai") ou a primeira chave cadastrada.
+function provedorIA() {
+  const escolhido = String(process.env.IA_PROVEDOR || "").toLowerCase();
+  if (escolhido === "openai" && process.env.OPENAI_API_KEY) return "openai";
+  if (escolhido === "gemini" && process.env.GEMINI_API_KEY) return "gemini";
+  if (process.env.GEMINI_API_KEY) return "gemini";
+  if (process.env.OPENAI_API_KEY) return "openai";
+  return null;
+}
+
 function responder(res, status, corpo) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -28,4 +38,4 @@ function responder(res, status, corpo) {
   res.end(JSON.stringify(corpo));
 }
 
-module.exports = { codigoOk, dentroDoLimite, responder };
+module.exports = { codigoOk, dentroDoLimite, responder, provedorIA };

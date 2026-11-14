@@ -16,7 +16,8 @@ const NEVER_CACHE = [
   "api.pexels.com",
   "images.pexels.com",
   "generativelanguage.googleapis.com",
-  "api.anthropic.com"
+  "api.anthropic.com",
+  "api.openai.com"
 ];
 
 self.addEventListener("install", event => {
