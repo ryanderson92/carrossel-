@@ -1,0 +1,6 @@
+{
+  "functions": {
+    "api/gerar.js": { "maxDuration": 60 },
+    "api/fotos.js": { "maxDuration": 15 }
+  }
+}

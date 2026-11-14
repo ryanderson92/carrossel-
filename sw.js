@@ -2,7 +2,7 @@
 // As APIs (IA e fotos) NUNCA passam pelo cache.
 // Oficial e teste ficam no mesmo endereço: cada um usa o próprio cache.
 const ENV = self.registration.scope.includes("/teste/") ? "gira-teste" : "gira";
-const CACHE = ENV + "-v1";
+const CACHE = ENV + "-v2";
 const APP_FILES = [
   "./",
   "./index.html",
@@ -42,6 +42,8 @@ self.addEventListener("fetch", event => {
   // Chamadas de IA e de fotos: direto para a rede, sem cache.
   if (NEVER_CACHE.some(host => url.hostname === host || url.hostname.endsWith("." + host))) return;
   if (!/^https?:$/.test(url.protocol)) return;
+  // Servidor do Gira (geração e fotos): sempre direto pela rede.
+  if (url.origin === self.location.origin && url.pathname.includes("/api/")) return;
   // A versão oficial não mexe nos arquivos da versão de teste.
   if (ENV === "gira" && url.origin === self.location.origin && url.pathname.includes("/teste/")) return;
 

@@ -39,6 +39,26 @@ Sem a chave do Pexels, você ainda pode subir fotos da galeria do seu aparelho.
 
 Se preferir o Claude, crie uma chave no [console da Anthropic](https://console.anthropic.com). O uso é cobrado.
 
+## Servidor do Gira (Vercel): gerar sem chave
+
+Quando o site roda na Vercel, as funções da pasta `api/` viram um servidor que guarda as chaves e faz as chamadas. Quem usa o app só escreve a ideia e toca em Gerar: não precisa de chave nenhuma.
+
+- `api/status`: avisa o app que existe servidor (nunca devolve as chaves).
+- `api/gerar`: escreve os textos com o Gemini.
+- `api/fotos`: busca fotos no Pexels.
+
+Variáveis de ambiente, configuradas no painel da Vercel (Settings → Environment Variables), nunca no código:
+
+| Variável | Para quê |
+|---|---|
+| `GEMINI_API_KEY` | Chave do Gemini (obrigatória) |
+| `PEXELS_API_KEY` | Chave do Pexels, para as fotos (opcional) |
+| `CODIGO_CONVITE` | Código que a pessoa digita no app para usar o servidor (recomendado) |
+| `LIMITE_DIARIO` | Carrosséis por pessoa por dia (padrão 30) |
+| `GEMINI_MODEL` | Modelo do Gemini (padrão `gemini-flash-latest`) |
+
+No GitHub Pages não existe servidor: o app continua pedindo a chave ou usando o modo de colar no chat.
+
 ## Publicação
 
 O site é publicado automaticamente no GitHub Pages a cada push na branch `main`, pelo workflow `.github/workflows/pages.yml`.

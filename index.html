@@ -147,6 +147,7 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:14px}
         <div class="field">
           <label>IA que escreve os textos</label>
           <div class="seg" id="prov">
+            <button type="button" data-v="servidor" aria-pressed="false" id="provServidorBtn" hidden>Gira (sem chave)</button>
             <button type="button" data-v="gemini" aria-pressed="true">Gemini (grátis)</button>
             <button type="button" data-v="claude" aria-pressed="false">Claude</button>
             <button type="button" data-v="manual" aria-pressed="false">Sem chave (usar um chat)</button>
@@ -172,6 +173,13 @@ details.more summary{cursor:pointer;color:var(--muted);font-size:14px}
           <div class="field">
             <label for="cfg-claudeModel">Modelo do Claude</label>
             <input type="text" id="cfg-claudeModel" autocomplete="off">
+          </div>
+        </div>
+        <div id="provServidor" hidden>
+          <div class="field" id="codigoField">
+            <label for="cfg-codigo">Código de convite</label>
+            <input type="text" id="cfg-codigo" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Peça o código para quem te convidou">
+            <p class="hint">O Gira escreve os textos e busca as fotos. Você não precisa de chave nenhuma.</p>
           </div>
         </div>
         <div id="provManual" hidden>
@@ -654,7 +662,7 @@ function wireImgBox(box,i){
   const note=t=>{const n=box.querySelector(".pnote");if(n)n.textContent=t};
   const doSearch=async()=>{
     const q=((box.querySelector('[data-f="q"]')||{}).value||"").trim();if(!q)return;
-    if(!cfg.pexels){note("Adicione a chave do Pexels em Configuração para buscar fotos.");return}
+    if(!temFotos()){note("Adicione a chave do Pexels em Configuração para buscar fotos.");return}
     const b=box.querySelector('[data-a="search"]');b.disabled=true;b.textContent="Buscando…";
     try{const found=await searchSlide(i,q);if(found)ensureImageTemplate();renderSlide(i);renderImgControls(i);if(!found)note("Nada encontrado. Tente termos em inglês, como “coffee shop”.")}
     catch(e){renderImgControls(i);note(e&&e.message||"Não foi possível buscar agora.")}
@@ -698,20 +706,36 @@ let ctl=null;
 
 /* configuração: as chaves ficam só no navegador deste aparelho */
 const CFG_KEY="gira-config";
-const cfg=Object.assign({provider:"gemini",gemini:"",geminiModel:"gemini-flash-latest",claude:"",claudeModel:"claude-sonnet-5-5",pexels:""},(()=>{try{return JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}catch(e){return{}}})());
+const cfg=Object.assign({provider:"gemini",gemini:"",geminiModel:"gemini-flash-latest",claude:"",claudeModel:"claude-sonnet-5-5",pexels:"",codigo:""},(()=>{try{return JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}catch(e){return{}}})());
 function saveCfg(){try{localStorage.setItem(CFG_KEY,JSON.stringify(cfg))}catch(e){}}
-["gemini","geminiModel","claude","claudeModel","pexels"].forEach(k=>{const el=$("cfg-"+k);el.value=cfg[k]||"";el.addEventListener("input",()=>{cfg[k]=el.value.trim();saveCfg();updateSetupUI()})});
+["gemini","geminiModel","claude","claudeModel","pexels","codigo"].forEach(k=>{const el=$("cfg-"+k);el.value=cfg[k]||"";el.addEventListener("input",()=>{cfg[k]=el.value.trim();saveCfg();updateSetupUI()})});
 function updateSetupUI(){
   const p=cfg.provider;
-  $("provGemini").hidden=p!=="gemini";$("provClaude").hidden=p!=="claude";$("provManual").hidden=p!=="manual";$("manualBox").hidden=p!=="manual";
+  $("provServidor").hidden=p!=="servidor";$("provGemini").hidden=p!=="gemini";$("provClaude").hidden=p!=="claude";$("provManual").hidden=p!=="manual";$("manualBox").hidden=p!=="manual";
   genBtn.hidden=p==="manual";
+  if(p==="servidor"){$("setupSummary").textContent=SERVER&&SERVER.convite&&!cfg.codigo?"Gira (falta o código de convite)":`Gira, sem chave${temFotos()?", com fotos":""}`;return}
   const ready=p==="manual"||(p==="gemini"&&cfg.gemini)||(p==="claude"&&cfg.claude);
-  $("setupSummary").textContent=`${p==="gemini"?"Gemini":p==="claude"?"Claude":"Sem chave, usando um chat"}${ready?"":" (falta a chave)"}, fotos ${cfg.pexels?"ativadas":"sem chave do Pexels"}`;
+  $("setupSummary").textContent=`${p==="gemini"?"Gemini":p==="claude"?"Claude":"Sem chave, usando um chat"}${ready?"":" (falta a chave)"}, fotos ${temFotos()?"ativadas":"sem chave do Pexels"}`;
 }
 function setProvider(v){cfg.provider=v;saveCfg();document.querySelectorAll("#prov button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===v)));updateSetupUI()}
 $("prov").addEventListener("click",e=>{const b=e.target.closest("button");if(b)setProvider(b.dataset.v)});
-setProvider(cfg.provider);
+/* servidor do Gira (Vercel): quando existe, gera e busca fotos sem chave no aparelho */
+let SERVER=null;
+const PROV_INICIAL=cfg.provider;
+function temFotos(){return !!(cfg.pexels||(SERVER&&SERVER.fotos))}
+async function detectServer(){
+  if(/\.github\.io$/.test(location.hostname)||location.protocol==="file:")return;
+  try{
+    const r=await fetch("api/status",{cache:"no-store"});if(!r.ok)return;
+    const d=await r.json();if(!d||!d.ok||!d.ia)return;
+    SERVER=d;$("provServidorBtn").hidden=false;$("codigoField").hidden=!d.convite;
+    if(PROV_INICIAL==="servidor"||(!cfg.gemini&&!cfg.claude))setProvider("servidor");else updateSetupUI();
+    $("setup").open=cfg.provider==="servidor"&&!!d.convite&&!cfg.codigo;
+  }catch(e){}
+}
+setProvider(cfg.provider==="servidor"?"gemini":cfg.provider);
 if(!cfg.gemini&&!cfg.claude&&!cfg.pexels)$("setup").open=true;
+detectServer();
 
 const ESTILOS={
   lista:{hint:"Uma dica ou ideia por slide. Ex.: 5 erros que travam o crescimento de uma loja online.",
@@ -800,6 +824,12 @@ function parseJSON(text){
   }
   throw new Error("json");
 }
+async function callServer(prompt,signal){
+  const r=await fetch("api/gerar",{method:"POST",signal,headers:{"Content-Type":"application/json","x-gira-codigo":cfg.codigo||""},body:JSON.stringify({prompt})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){if(r.status===401){$("setup").open=true;throw new Error("Código de convite inválido. Confira em Configuração.")}throw new Error(d.erro||`O servidor respondeu com erro (${r.status}).`)}
+  return d.text||"";
+}
 async function callGemini(prompt,signal){
   const model=encodeURIComponent(cfg.geminiModel||"gemini-flash-latest");
   const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:"POST",signal,headers:{"Content-Type":"application/json","x-goog-api-key":cfg.gemini},
@@ -822,7 +852,7 @@ async function applyData(data,signal){
   state.slides=slides;state.caption=[String(data.legenda||"").trim(),tags.join(" ")].filter(Boolean).join("\n\n");state.isExample=false;
   buildAll();strip.scrollLeft=0;
   if(window.innerWidth<960)strip.scrollIntoView({block:"start"});
-  if(cfg.pexels)await fetchPhotosAll(signal);
+  if(temFotos())await fetchPhotosAll(signal);
 }
 async function copyText(t){try{await navigator.clipboard.writeText(t);return true}catch(e){return false}}
 genBtn.addEventListener("click",async()=>{
@@ -836,11 +866,15 @@ genBtn.addEventListener("click",async()=>{
     if(!ok){$("manualPrompt").focus();$("manualPrompt").select()}
     return;
   }
-  const key=cfg.provider==="gemini"?cfg.gemini:cfg.claude;
-  if(!key){setStatus("Adicione a chave da IA em Configuração, ou escolha “Sem chave (usar um chat)”.",true);$("setup").open=true;$("setup").scrollIntoView({block:"start"});return}
+  if(cfg.provider==="servidor"){
+    if(SERVER&&SERVER.convite&&!cfg.codigo){setStatus("Digite o código de convite em Configuração.",true);$("setup").open=true;$("setup").scrollIntoView({block:"start"});$("cfg-codigo").focus();return}
+  }else{
+    const key=cfg.provider==="gemini"?cfg.gemini:cfg.claude;
+    if(!key){setStatus("Adicione a chave da IA em Configuração, ou escolha “Sem chave (usar um chat)”.",true);$("setup").open=true;$("setup").scrollIntoView({block:"start"});return}
+  }
   genBtn.disabled=true;ctl=new AbortController();stopBtn.hidden=false;setStatus("Escrevendo os slides…");
   try{
-    const text=cfg.provider==="gemini"?await callGemini(prompt,ctl.signal):await callClaude(prompt,ctl.signal);
+    const text=cfg.provider==="servidor"?await callServer(prompt,ctl.signal):cfg.provider==="gemini"?await callGemini(prompt,ctl.signal):await callClaude(prompt,ctl.signal);
     let data;try{data=parseJSON(text)}catch(e){throw new Error("A resposta veio incompleta. Toque em Gerar carrossel de novo.")}
     await applyData(data,ctl.signal);
     setStatus(`Pronto: ${state.slides.length} slides. Ajuste o que quiser abaixo.`);
@@ -946,6 +980,13 @@ $("pasteManual").addEventListener("click",async()=>{
 /* ---------- fotos do Pexels ---------- */
 function orient(){return state.format==="1:1"?"square":"portrait"}
 async function pexelsSearch(q,signal){
+  if(!cfg.pexels&&SERVER&&SERVER.fotos){
+    const r=await fetch(`api/fotos?q=${encodeURIComponent(q)}&orientation=${orient()}`,{headers:{"x-gira-codigo":cfg.codigo||""},signal});
+    const d=await r.json().catch(()=>({}));
+    if(r.status===401)throw new Error("Código de convite inválido. Confira em Configuração.");
+    if(!r.ok)throw new Error(d.erro||`A busca de fotos falhou (${r.status}).`);
+    return d.photos||[];
+  }
   const r=await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=12&orientation=${orient()}`,{headers:{Authorization:cfg.pexels},signal});
   if(r.status===401||r.status===403)throw new Error("O Pexels recusou a chave. Confira em Configuração.");
   if(r.status===429)throw new Error("Limite de buscas do Pexels atingido por agora. Tente mais tarde.");
@@ -971,7 +1012,7 @@ async function searchSlide(i,q,signal,avoid){
   await usePhoto(i,k,signal);if(avoid)avoid.add(s.results[k].id);return true;
 }
 async function fetchPhotosAll(signal){
-  if(!cfg.pexels){imgNote.textContent="Adicione a chave do Pexels em Configuração para buscar fotos.";return}
+  if(!temFotos()){imgNote.textContent="Adicione a chave do Pexels em Configuração para buscar fotos.";return}
   const avoid=new Set(),n=state.slides.length;let ok=0,err=null;
   for(let i=0;i<n;i++){
     const s=state.slides[i],q=s.busca||s.titulo;if(!q)continue;
